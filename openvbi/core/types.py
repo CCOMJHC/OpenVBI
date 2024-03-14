@@ -1,5 +1,5 @@
 
-from typing import Enum
+from enum import Enum
 from openvbi.core.statistics import PktStats
 
 ## Encapsulate the types of real-world time information that can be used

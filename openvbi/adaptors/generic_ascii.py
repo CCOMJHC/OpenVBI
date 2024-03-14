@@ -1,6 +1,6 @@
-##\file timebase.py
+##\file generic_ascii.py
 #
-# Generate a reliable timebase from raw time observations
+# Read files of generic ASCII NMEA0183 data into internal format for processing
 #
 # Copyright 2023 OpenVBI Project.  All Rights Reserved.
 #
@@ -23,14 +23,18 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
-from openvbi.core.types import TimeSource
-from openvbi.core.observations import RawObs
-from openvbi.core.interpolation import InterpTable
+from openvbi.core.observations import RawN0183Obs
+from openvbi.core.statistics import PktStats
 
-def generate_timebase(messages: List[RawObs], source: TimeSource) -> InterpTable:
-    time_table = InterpTable(['ref',])
-    for message in messages:
-        if message.HasTime() and message.MatchesTimeSource(source):
-            time_table.add_point(message.Elapsed(), 'ref', message.Timestamp())
-    return time_table
+from typing import List, Tuple
+
+def load_data(filename: str) -> Tuple[List[RawN0183Obs],PktStats]:
+    data = list()
+    stats: PktStats = PktStats(fault_limit=10)
+    with open(filename) as f:
+        for line in f:
+            elapsed, message = line.split(' ')
+            obs = RawN0183Obs(int(elapsed), message)
+            data.append(obs)
+            stats.Observed(obs.Name())
+    return data,stats

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
-from datetime import datetime
-from marulc import NMEA1083Parser, NMEA2000Parser
+import datetime
+from marulc import NMEA0183Parser, NMEA2000Parser
 from marulc.exceptions import ParseError, ChecksumError, PGNError
 from openvbi.core.types import TimeSource
 from openvbi.core.statistics import PktStats
@@ -34,7 +34,7 @@ class RawObs(ABC):
 
 class RawN0183Obs(RawObs):
     def __init__(self, elapsed: int, message: str) -> None:
-        parser = NMEA1083Parser()
+        parser = NMEA0183Parser()
         try:
             self._data = parser.unpack(message)
             if self._data['Formatter'] == 'ZDA' or self._data['Formatter'] == 'RMC':
@@ -59,7 +59,9 @@ class RawN0183Obs(RawObs):
     def Timestamp(self) -> float:
         if not self.HasTime():
             return -1.0
-        reftime = datetime.combine(self._data['Fields']['date'], self._data['Fields']['time'])
+        base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
+        time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
+        reftime = base_date + time_offset
         return reftime.timestamp()
     
 class RawN2000Obs(RawObs):
