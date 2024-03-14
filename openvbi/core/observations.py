@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 import datetime
+from dataclasses import dataclass
 from marulc import NMEA0183Parser, NMEA2000Parser
 from marulc.exceptions import ParseError, ChecksumError, PGNError
 from openvbi.core.types import TimeSource
@@ -119,3 +120,18 @@ def count_messages(messages: List[RawObs]) -> PktStats:
     for message in messages:
         stats.Observed(message.Name())
     return stats
+
+@dataclass
+class Depth:
+    t: float
+    lat: float
+    lon: float
+    depth: float
+    uncrt: float
+
+    def __init__(self, t: float, lon: float, lat: float, depth: float, uncrt: float = -1.0) -> None:
+        self.t = t
+        self.lat = lat
+        self.lon = lon
+        self.depth = depth
+        self.uncrt = uncrt
