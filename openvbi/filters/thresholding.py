@@ -1,6 +1,6 @@
-##\file __init__.py
+##\file thresholding.py
 #
-# Version information for the library
+# Routines for over/under thresholding of depth data
 #
 # Copyright 2023 OpenVBI Project.  All Rights Reserved.
 #
@@ -23,4 +23,30 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-__version__ = '1.0.0'
+from typing import List
+from openvbi.filters import Filter
+from openvbi.core.observations import Depth
+
+# Remove any points that are shoaler than the threshold specified
+class shoaler_than(Filter):
+    def __init__(self, threshold: float) -> None:
+        self._threshold = threshold
+    
+    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+        out: List[Depth] = list()
+        for observation in dataset:
+            if observation.depth < self._threshold:
+                out.append(observation)
+        return out
+
+# Remove any points that are deeper than the threshold specified
+class deeper_than(Filter):
+    def __init__(self, threshold: float) -> None:
+        self._threshold = threshold
+
+    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+        out: List[Depth] = list()
+        for observation in dataset:
+            if observation.depth >= self._threshold:
+                out.append(observation)
+        return out

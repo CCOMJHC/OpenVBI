@@ -27,14 +27,15 @@ from typing import List
 from openvbi.core.observations import RawObs, Depth
 from openvbi.core.types import TimeSource
 from openvbi.core.interpolation import InterpTable
+from openvbi.adaptors import Dataset
 
-def generate_dataset(rawobs: List[RawObs], timeinfo: InterpTable, depth: str) -> List[Depth]:
+def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
     data = list()
     
     depth_table = InterpTable(['z',])
     position_table = InterpTable(['lon', 'lat'])
 
-    for obs in rawobs:
+    for obs in dataset.packets:
         if obs.Name() == depth:
             depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth_meters'])
         if obs.Name() == 'GGA':
@@ -50,7 +51,7 @@ def generate_dataset(rawobs: List[RawObs], timeinfo: InterpTable, depth: str) ->
     
     depth_timepoints = depth_table.ind()
     z = depth_table.var('z')
-    z_times = timeinfo.interpolate(['ref'], depth_timepoints)[0]
+    z_times = dataset.timebase.interpolate(['ref'], depth_timepoints)[0]
     z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)
     
     for n in range(depth_table.n_points()):

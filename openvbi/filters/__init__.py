@@ -1,6 +1,6 @@
 ##\file __init__.py
 #
-# Version information for the library
+# General types and routines for filtering depth data
 #
 # Copyright 2023 OpenVBI Project.  All Rights Reserved.
 #
@@ -23,4 +23,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-__version__ = '1.0.0'
+from typing import List
+from abc import ABC, abstractmethod
+from openvbi.core.observations import Depth
+
+class Filter(ABC):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+        pass

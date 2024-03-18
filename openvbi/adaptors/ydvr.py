@@ -1,6 +1,6 @@
-##\file __init__.py
+##\file ydvr.py
 #
-# Version information for the library
+# Read files of NMEA2000 data logged by the Yacht Devices logger
 #
 # Copyright 2023 OpenVBI Project.  All Rights Reserved.
 #
@@ -22,5 +22,3 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-
-__version__ = '1.0.0'

@@ -24,9 +24,23 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from typing import List
-from openvbi.core.types import TimeSource
+from openvbi.core.types import TimeSource, NoTimeSource
 from openvbi.core.observations import RawObs
 from openvbi.core.interpolation import InterpTable
+from openvbi.core.statistics import PktStats
+
+def determine_timesource(stats: PktStats) -> TimeSource:
+    if stats.Seen('SystemTime'):
+        rtn = TimeSource.Time_SysTime
+    elif stats.Seen('GNSS'):
+        rtn = TimeSource.Time_GNSS
+    elif stats.Seen('ZDA'):
+        rtn = TimeSource.Time_ZDA
+    elif stats.Seen('RMC'):
+        rtn = TimeSource.Time_RMC
+    else:
+        raise NoTimeSource()
+    return rtn
 
 def generate_timebase(messages: List[RawObs], source: TimeSource) -> InterpTable:
     time_table = InterpTable(['ref',])

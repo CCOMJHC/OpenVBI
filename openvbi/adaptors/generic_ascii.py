@@ -25,16 +25,28 @@
 
 from openvbi.core.observations import RawN0183Obs
 from openvbi.core.statistics import PktStats
+from openvbi.adaptors import Dataset
+import openvbi.timestamping.timebase as timebase
 
-from typing import List, Tuple
+def load_data(filename: str, maxelapsed: int) -> Dataset:
+    rtn: Dataset = Dataset()
 
-def load_data(filename: str) -> Tuple[List[RawN0183Obs],PktStats]:
-    data = list()
-    stats: PktStats = PktStats(fault_limit=10)
+    # The elapsed time is milliseconds since the start of logging, and can wrap round
+    # depending on the length of the counter (on some systems it's 16 bit) and the runtime
+    # of the logger.  We look for this by checking whether the next packet has a timestamp
+    # that appears to go backwards, and add in another offset of the maxelapsed time.
+    elapsed_offset: int = 0
+    last_elapsed_mark: int = 0
+
     with open(filename) as f:
         for line in f:
             elapsed, message = line.split(' ')
-            obs = RawN0183Obs(int(elapsed), message)
-            data.append(obs)
-            stats.Observed(obs.Name())
-    return data,stats
+            elapsed = int(elapsed)
+            if elapsed < last_elapsed_mark:
+                elapsed_offset = elapsed_offset + maxelapsed
+            obs = RawN0183Obs(elapsed + elapsed_offset, message)
+            rtn.packets.append(obs)
+            rtn.stats.Observed(obs.Name())
+    rtn.timesrc = timebase.determine_timesource(rtn.stats)
+    rtn.timebase = timebase.generate_timebase(rtn.packets, rtn.timesrc)
+    return rtn

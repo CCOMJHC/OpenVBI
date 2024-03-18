@@ -1,6 +1,6 @@
-##\file __init__.py
+##\file deduplicate.py
 #
-# Version information for the library
+# Routine to deduplicate depths in the dataset
 #
 # Copyright 2023 OpenVBI Project.  All Rights Reserved.
 #
@@ -23,4 +23,13 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-__version__ = '1.0.0'
+from typing import List
+from openvbi.core.observations import Depth
+from openvbi.filters import Filter
+
+class deduplicate(Filter):
+    def __init__(self) -> None:
+        pass
+
+    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+        pass
