@@ -27,7 +27,8 @@ from abc import ABC, abstractmethod
 from typing import List
 import datetime
 from dataclasses import dataclass
-from marulc import NMEA0183Parser, NMEA2000Parser
+from marulc import NMEA0183Parser, NMEA2000Parser, parse_from_iterator
+from marulc.nmea2000 import unpack_complete_message
 from marulc.exceptions import ParseError, ChecksumError, PGNError
 from openvbi.core.types import TimeSource
 from openvbi.core.statistics import PktStats
@@ -94,21 +95,30 @@ class RawN0183Obs(RawObs):
         return reftime.timestamp()
     
 class RawN2000Obs(RawObs):
-    def __init__(self, elapsed: int, message: str) -> None:
+    def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
         parser = NMEA2000Parser()
         has_time = False
         try:
-            self._data = parser.unpack(message)
+            self._data = unpack_complete_message(pgn, message)
+            if not hasattr(self, '_data'):
+                raise BadData()
+        except KeyError:
+            raise BadData()
         except PGNError:
             raise BadData()
         except ParseError:
             raise BadData()
-        if self._data['PGN'] == 126992:
+        print(self._data)
+        if pgn == 126992:
             name = 'SystemTime'
             has_time = True
-        elif self.__data['PGN'] == 128267:
+        elif pgn == 127257:
+            name = 'Attitude'
+        elif pgn == 128267:
             name = 'Depth'
-        elif self._data['PGN'] == 129029:
+        elif pgn == 129026:
+            name = 'COG'
+        elif pgn == 129029:
             name = 'GNSS'
         else:
             name = 'Unrecognized'
