@@ -27,6 +27,9 @@ import struct
 from typing import Tuple, Union
 from openvbi.adaptors import Dataset
 from openvbi.core.observations import RawN2000Obs, BadData
+from openvbi.core.statistics import PktFaults
+import openvbi.timestamping.timebase as timebase
+from marulc.nmea2000 import get_description_for_pgn
 from marulc.exceptions import ParseError
 
 def TranslateCANId(id: int) -> Tuple[int, int, int, int]:
@@ -77,8 +80,6 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
         pgn = msgid
     else:
         priority, pgn, source, destination = TranslateCANId(msgid)
-
-    print(f'Timestamp {elapsed}, msgid {msgid}, pgn {pgn}')
     
     if pgn == 59904:
         datalen = 3
@@ -92,8 +93,6 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
 
     packet = f.read(datalen)
 
-    print(f'Packet: |{packet}|')
-
     return elapsed, pgn, packet
 
 
@@ -102,18 +101,30 @@ def load_data(filename: str) -> Dataset:
 
     with open(filename, 'rb') as f:
         while f:
+            pkt_name = 'Unknown'
             elapsed, pgn, packet = next_packet(f)
+            try:
+                descr = get_description_for_pgn(pgn)
+                pkt_name = descr['Description']
+            except ValueError:
+                pkt_name = 'Unknown'
             if elapsed < 0:
                 break
             try:
                 obs = RawN2000Obs(elapsed, pgn, packet)
-                print(f'PGN {pgn}, Name {obs.Name()}, Data |{obs._data}|')
                 data.packets.append(obs)
+                data.stats.Observed(obs.Name())
             except BadData as e:
-                print(f'BadData: {e}')
+                data.stats.Observed(pkt_name)
+                data.stats.Fault(pkt_name, PktFaults.DecodeFault)
             except ParseError as e:
-                print(f'Parse Error: {e}')
+                data.stats.Observed(pkt_name)
+                data.stats.Fault(pkt_name, PktFaults.ParseFault)
             except RuntimeError as e:
-                print(f'Runtime Error: {e}')
+                data.stats.Observed(pkt_name)
+                data.stats.Fault(pkt_name, PktFaults.DecodeFault)
     
+    data.timesrc = timebase.determine_timesource(data.stats)
+    data.timebase = timebase.generate_timebase(data.packets, data.timesrc)
+
     return data

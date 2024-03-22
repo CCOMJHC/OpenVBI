@@ -29,6 +29,9 @@ from openvbi.core.types import TimeSource
 from openvbi.core.interpolation import InterpTable
 from openvbi.adaptors import Dataset
 
+class NoDepths(RuntimeError):
+    pass
+
 def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
     data = list()
     
@@ -50,6 +53,8 @@ def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
             position_table.add_points(obs.Elapsed(), ('lon', 'lat'), (lon, lat))
     
     depth_timepoints = depth_table.ind()
+    if len(depth_timepoints) == 0:
+        raise NoDepths()
     z = depth_table.var('z')
     z_times = dataset.timebase.interpolate(['ref'], depth_timepoints)[0]
     z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)

@@ -28,8 +28,9 @@ from typing import List
 import datetime
 from dataclasses import dataclass
 from marulc import NMEA0183Parser, NMEA2000Parser, parse_from_iterator
-from marulc.nmea2000 import unpack_complete_message
+from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
+import bitstruct
 from openvbi.core.types import TimeSource
 from openvbi.core.statistics import PktStats
 
@@ -108,7 +109,8 @@ class RawN2000Obs(RawObs):
             raise BadData()
         except ParseError:
             raise BadData()
-        print(self._data)
+        except bitstruct.Error:
+            raise BadData()
         if pgn == 126992:
             name = 'SystemTime'
             has_time = True
@@ -121,7 +123,14 @@ class RawN2000Obs(RawObs):
         elif pgn == 129029:
             name = 'GNSS'
         else:
-            name = 'Unrecognized'
+            # Attempt to get the PGN name from the MARULC database.  We could do this for
+            # all PGNs, but the names above are for data that we use everywhere, and we
+            # want them to be consistent.
+            try:
+                descr = get_description_for_pgn(pgn)
+                name = descr['Description']
+            except ValueError:
+                name = 'Unrecognized'
         super().__init__(elapsed, name, has_time)
 
     def MatchesTimeSource(self, source: TimeSource) -> bool:
