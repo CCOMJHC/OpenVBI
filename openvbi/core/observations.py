@@ -27,6 +27,7 @@ from abc import ABC, abstractmethod
 from typing import List
 import datetime
 from dataclasses import dataclass
+import pandas
 from marulc import NMEA0183Parser, NMEA2000Parser, parse_from_iterator
 from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
@@ -184,3 +185,9 @@ class Depth:
         self.lon = lon
         self.depth = depth
         self.uncrt = uncrt
+
+def generate_depth_table(depths: List[Depth]) -> pandas.DataFrame:
+    tab = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
+    for d in depths:
+        tab.loc[len(tab)] = [d.t, d.lon, d.lat, d.depth, d.uncrt]
+    return tab
