@@ -44,6 +44,7 @@ def load_data(filename: str, maxelapsed: int) -> Dataset:
             elapsed = int(elapsed)
             if elapsed < last_elapsed_mark:
                 elapsed_offset = elapsed_offset + maxelapsed
+            last_elapsed_mark = elapsed
             obs = RawN0183Obs(elapsed + elapsed_offset, message)
             rtn.packets.append(obs)
             rtn.stats.Observed(obs.Name())

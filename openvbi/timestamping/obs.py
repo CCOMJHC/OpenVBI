@@ -39,24 +39,34 @@ def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
     position_table = InterpTable(['lon', 'lat'])
 
     for obs in dataset.packets:
-        if obs.Name() == depth:
-            depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth_meters'])
-        if obs.Name() == 'GGA':
+        if obs.Name() == depth and obs.Elapsed() is not None:
+            if depth == 'Depth':
+                # NMEA2000
+                depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth'])
+            else:
+                # NMEA0183
+                depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth_meters'])
+        if obs.Name() == 'GGA' and obs.Elapsed() is not None:
             raw_lon = obs._data['Fields']['lon']
             raw_lat = obs._data['Fields']['lat']
-            lon = raw_lon/100 + (raw_lon % 100)/60
-            if obs._data['Fields']['lon_dir'] == 'W':
-                lon = - lon
-            lat = raw_lat/100 + (raw_lat % 100)/60
-            if obs._data['Fields']['lat_dir'] == 'S':
-                lat = - lat
+            if isinstance(raw_lon, float) and isinstance(raw_lat, float):
+                lon = raw_lon/100 + (raw_lon % 100)/60
+                if obs._data['Fields']['lon_dir'] == 'W':
+                    lon = - lon
+                lat = raw_lat/100 + (raw_lat % 100)/60
+                if obs._data['Fields']['lat_dir'] == 'S':
+                    lat = - lat
+                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), (lon, lat))
+        if obs.Name() == 'GNSS' and obs.Elapsed() is not None:
+            lon = obs._data['Fields']['longitude']
+            lat = obs._data['Fields']['latitude']
             position_table.add_points(obs.Elapsed(), ('lon', 'lat'), (lon, lat))
     
     depth_timepoints = depth_table.ind()
     if len(depth_timepoints) == 0:
         raise NoDepths()
     z = depth_table.var('z')
-    z_times = dataset.timebase.interpolate(['ref'], depth_timepoints)[0]
+    z_times = dataset.timebase.interpolate(['ref',], depth_timepoints)[0]
     z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)
     
     for n in range(depth_table.n_points()):

@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from openvbi.core.observations import RawN0183Obs
+from openvbi.core.observations import RawN0183Obs, BadData
 from openvbi.core.statistics import PktStats
 from openvbi.adaptors import Dataset
 import openvbi.timestamping.timebase as timebase
@@ -33,9 +33,12 @@ def load_data(filename: str) -> Dataset:
 
     with open(filename) as f:
         for message in f:
-            obs = RawN0183Obs(0, message)
-            rtn.packets.append(obs)
-            rtn.stats.Observed(obs.Name())
+            try:
+                obs = RawN0183Obs(None, message)
+                rtn.packets.append(obs)
+                rtn.stats.Observed(obs.Name())
+            except BadData:
+                pass
     rtn.timesrc = timebase.determine_timesource(rtn.stats)
 
     # TeamSurv systems don't have elapsed time (and intermingle two streams of
@@ -50,28 +53,27 @@ def load_data(filename: str) -> Dataset:
             packet_real_time = rtn.packets[n].Timestamp()
             if realtime_elapsed_zero is None:
                 realtime_elapsed_zero = packet_real_time
-                rtn.packets[n].SetElapsed(0)
+                rtn.packets[n].SetElapsed(0.0)
             else:
                 rtn.packets[n].SetElapsed(1000.0*(packet_real_time - realtime_elapsed_zero))
     
-    # Now we need to patch up all the packets with elapsed time still at zero
+    # Now we need to patch up all the packets with elapsed time still set to None
     oldest_position = None
     for n in range(len(rtn.packets)):
-        if rtn.packets[n].Elapsed() == 0:
-            if n > 0 and rtn.packets[n].Elapsed() > 0:
-                oldest_position = n-1
+        if rtn.packets[n].Elapsed() is not None:
+            if oldest_position is None:
+                # First time we've seen something that has a timestamp
+                oldest_position = n
             else:
-                if oldest_position is not None:
-                    if n - oldest_position > 1:
-                        target_elapsed_time = (rtn.packets[oldest_position].Elapsed() + rtn.packets[n].Elapsed())/2.0
-                        for i in range(n - oldest_position - 1):
-                            rtn.packets[oldest_position + 1 + i].SetElapsed(target_elapsed_time)
-                        oldest_position = None
-    
-    # Finally, we replace any timestamps that weren't interpolated to make sure that there's
-    # no question that they're not valid
-    for n in range(len(rtn.packets)):
-        if rtn.packets[n].Elapsed() == 0:
-            rtn.packets[n].SetElapsed(None)
+                # Subsequent timestamped data, so (oldest_position, n) need set to the mean
+                # time of the two timestamped packets (which is the best we can do, since we
+                # don't have any record of when they actually arrived)
+                target_elapsed_time = (rtn.packets[oldest_position].Elapsed() + rtn.packets[n].Elapsed())/2.0
+                for i in range(oldest_position+1,n):
+                    rtn.packets[i].SetElapsed(target_elapsed_time)
+                # Update position of the previous timestamp to now
+                oldest_position = n
 
     rtn.timebase = timebase.generate_timebase(rtn.packets, rtn.timesrc)
+
+    return rtn

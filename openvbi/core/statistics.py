@@ -224,5 +224,5 @@ class PktStats:
         n_sentences = len(self.packets)
         rtn = f'Packet Statistics ({n_sentences} unique seen):\n'
         for p in self.packets:
-            rtn += f'\t{p:>46}: {self.packets[p]}\n'
+            rtn += f'\t{p:>50}: {self.packets[p]}\n'
         return rtn

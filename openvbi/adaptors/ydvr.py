@@ -99,6 +99,20 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
 def load_data(filename: str) -> Dataset:
     data: Dataset = Dataset()
 
+    # The elapsed time is milliseconds since the start of logging, and can wrap round.
+    # We look for this by checking whether the next packet has a timestamp that appears
+    # to go backwards, and add in another offset of the maxelapsed time.  The algorithm
+    # here implicitly assumes that no more than one wrap can happen in a single step
+    # (i.e., that you have at least one packet in each cycle of the counter), since
+    # there is otherwise no way to determine how many cycles have occurred and therefore
+    # how many increments to add.  Even for 16-bit counters (as here) that's pretty unlikely,
+    # but could happen.
+    elapsed_offset: int = 0
+    last_elapsed_mark: int = 0
+    # The YDVR data logger records elapsed time in milliseconds at reception, but only has
+    # 16-bit range, so it cycles quite a bit.
+    maxelapsed: int = 65535
+
     with open(filename, 'rb') as f:
         while f:
             pkt_name = 'Unknown'
@@ -110,8 +124,11 @@ def load_data(filename: str) -> Dataset:
                 pkt_name = 'Unknown'
             if elapsed < 0:
                 break
+            if elapsed < last_elapsed_mark:
+                elapsed_offset = elapsed_offset + maxelapsed
+            last_elapsed_mark = elapsed
             try:
-                obs = RawN2000Obs(elapsed, pgn, packet)
+                obs = RawN2000Obs(elapsed + elapsed_offset, pgn, packet)
                 data.packets.append(obs)
                 data.stats.Observed(obs.Name())
             except BadData as e:

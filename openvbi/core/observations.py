@@ -38,7 +38,7 @@ class BadData(Exception):
     pass
 
 class RawObs(ABC):
-    def __init__(self, elapsed: int, name: str, hastime: bool) -> None:
+    def __init__(self, elapsed: float, name: str, hastime: bool) -> None:
         self._elapsed = elapsed
         self._name = name
         self._hastime = hastime
@@ -46,10 +46,10 @@ class RawObs(ABC):
     def Name(self) -> str:
         return self._name
     
-    def Elapsed(self) -> int:
+    def Elapsed(self) -> float:
         return self._elapsed
 
-    def SetElapsed(self, elapsed: int) -> None:
+    def SetElapsed(self, elapsed: float) -> None:
         self._elapsed = elapsed
     
     def HasTime(self) -> bool:
@@ -110,6 +110,8 @@ class RawN2000Obs(RawObs):
         except ParseError:
             raise BadData()
         except bitstruct.Error:
+            raise BadData()
+        except TypeError:
             raise BadData()
         if pgn == 126992:
             name = 'SystemTime'
