@@ -191,3 +191,12 @@ def generate_depth_table(depths: List[Depth]) -> pandas.DataFrame:
     for d in depths:
         tab.loc[len(tab)] = [d.t, d.lon, d.lat, d.depth, d.uncrt]
     return tab
+
+def generate_depth_list(depths: pandas.DataFrame) -> List[Depth]:
+    out = list()
+    for n in range(len(depths)):
+        target = Depth(depths['t'][n], depths['lat'][n], depths['lon'][n], depths['z'][n], -1.0)
+        if 'u' in depths:
+            target.uncrt = depths['u'][n]
+        out.append(target)
+    return out

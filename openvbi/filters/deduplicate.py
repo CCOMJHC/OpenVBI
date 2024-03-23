@@ -28,8 +28,17 @@ from openvbi.core.observations import Depth
 from openvbi.filters import Filter
 
 class deduplicate(Filter):
-    def __init__(self) -> None:
-        pass
+    def __init__(self, verbose: bool) -> None:
+        self._verbose = verbose
 
     def Execute(self, dataset: List[Depth]) -> List[Depth]:
-        pass
+        current_depth: float = 0
+        out_depths = list()
+        n_in: int = len(dataset)
+        for n in range(n_in):
+            if dataset[n].depth != current_depth:
+                out_depths.append(dataset[n])
+                current_depth = dataset[n].depth
+        if self._verbose:
+            print(f'After deduplication, total {len(out_depths)} points selected from {n_in}.')
+        return out_depths
