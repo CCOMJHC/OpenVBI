@@ -23,20 +23,16 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
+import geopandas
 from openvbi.filters import Filter
-from openvbi.core.observations import Depth
 
 # Remove any points that are shoaler than the threshold specified
 class shoaler_than(Filter):
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
     
-    def Execute(self, dataset: List[Depth]) -> List[Depth]:
-        out: List[Depth] = list()
-        for observation in dataset:
-            if observation.depth < self._threshold:
-                out.append(observation)
+    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        out = dataset[dataset['z'] > self._threshold]
         return out
 
 # Remove any points that are deeper than the threshold specified
@@ -44,9 +40,6 @@ class deeper_than(Filter):
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
 
-    def Execute(self, dataset: List[Depth]) -> List[Depth]:
-        out: List[Depth] = list()
-        for observation in dataset:
-            if observation.depth >= self._threshold:
-                out.append(observation)
+    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        out = dataset[dataset['z'] < self._threshold]
         return out

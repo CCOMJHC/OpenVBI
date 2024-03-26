@@ -23,8 +23,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
-from openvbi.core.observations import RawObs, Depth
+import pandas
+import geopandas
+from openvbi.core.observations import RawObs
 from openvbi.core.types import TimeSource
 from openvbi.core.interpolation import InterpTable
 from openvbi.adaptors import Dataset
@@ -32,9 +33,7 @@ from openvbi.adaptors import Dataset
 class NoDepths(RuntimeError):
     pass
 
-def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
-    data = list()
-    
+def generate_observations(dataset: Dataset, depth: str) -> geopandas.GeoDataFrame:
     depth_table = InterpTable(['z',])
     position_table = InterpTable(['lon', 'lat'])
 
@@ -69,8 +68,7 @@ def generate_observations(dataset: Dataset, depth: str) -> List[Depth]:
     z_times = dataset.timebase.interpolate(['ref',], depth_timepoints)[0]
     z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)
     
+    data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
     for n in range(depth_table.n_points()):
-        pt = Depth(z_times[n], z_lon[n], z_lat[n], z[n])
-        data.append(pt)
-    
-    return data
+        data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], -1.0]
+    return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')

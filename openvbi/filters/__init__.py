@@ -23,14 +23,13 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
+import geopandas
 from abc import ABC, abstractmethod
-from openvbi.core.observations import Depth
 
 class Filter(ABC):
     def __init__(self):
         pass
 
     @abstractmethod
-    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         pass

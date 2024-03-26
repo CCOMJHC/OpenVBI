@@ -23,22 +23,21 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
-from openvbi.core.observations import Depth
+import geopandas
 from openvbi.filters import Filter
 
 class deduplicate(Filter):
     def __init__(self, verbose: bool) -> None:
         self._verbose = verbose
 
-    def Execute(self, dataset: List[Depth]) -> List[Depth]:
+    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         current_depth: float = 0
-        out_depths = list()
+        out_index = []
         n_in: int = len(dataset)
         for n in range(n_in):
-            if dataset[n].depth != current_depth:
-                out_depths.append(dataset[n])
-                current_depth = dataset[n].depth
+            if dataset['z'][n] != current_depth:
+                out_index.append(n)
+                current_depth = dataset['z'][n]
         if self._verbose:
-            print(f'After deduplication, total {len(out_depths)} points selected from {n_in}.')
-        return out_depths
+            print(f'After deduplication, total {len(out_index)} points selected from {n_in}.')
+        return dataset.iloc[out_index]

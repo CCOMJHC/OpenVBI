@@ -28,6 +28,7 @@ from typing import List
 import datetime
 from dataclasses import dataclass
 import pandas
+import geopandas
 from marulc import NMEA0183Parser, NMEA2000Parser, parse_from_iterator
 from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
@@ -186,13 +187,13 @@ class Depth:
         self.depth = depth
         self.uncrt = uncrt
 
-def generate_depth_table(depths: List[Depth]) -> pandas.DataFrame:
+def generate_depth_table(depths: List[Depth]) -> geopandas.GeoDataFrame:
     tab = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
     for d in depths:
         tab.loc[len(tab)] = [d.t, d.lon, d.lat, d.depth, d.uncrt]
-    return tab
+    return geopandas.GeoDataFrame(tab, geometry=geopandas.points_from_xy(tab.lon, tab.lat), crs='EPSG:4326')
 
-def generate_depth_list(depths: pandas.DataFrame) -> List[Depth]:
+def generate_depth_list(depths: geopandas.GeoDataFrame) -> List[Depth]:
     out = list()
     for n in range(len(depths)):
         target = Depth(depths['t'][n], depths['lat'][n], depths['lon'][n], depths['z'][n], -1.0)
