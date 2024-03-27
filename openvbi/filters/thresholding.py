@@ -30,6 +30,7 @@ from openvbi.filters import Filter
 class shoaler_than(Filter):
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
+        super().__init__()
     
     def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         out = dataset[dataset['z'] > self._threshold]
@@ -39,6 +40,7 @@ class shoaler_than(Filter):
 class deeper_than(Filter):
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
+        super().__init__()
 
     def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         out = dataset[dataset['z'] < self._threshold]
