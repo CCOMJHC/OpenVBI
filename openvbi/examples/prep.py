@@ -1,9 +1,10 @@
 import time
+import pandas
 from openvbi.adaptors.ydvr import load_data
 from openvbi.timestamping.obs import generate_observations
 from openvbi.filters.thresholding import shoaler_than, deeper_than
 from openvbi.filters.timeslot import before_time, after_time
-from openvbi.corrections.waterlevel.noaa import SingleStation
+from openvbi.corrections.waterlevel.noaa import SingleStation, ZoneTides
 
 startTime = time.perf_counter()
 data = load_data('/Users/brc/Projects-Extras/OpenVBI/ExampleData/00030095.DAT')
@@ -15,7 +16,9 @@ depths = generate_observations(data, 'Depth')
 endTime = time.perf_counter()
 print(f'GenerateObservations: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
-print(depths)
+print('\nSource data after load:')
+with pandas.option_context('display.float_format', '{:.6f}'.format):
+    print(depths)
 min_depth = depths['z'].min()
 max_depth = depths['z'].max()
 min_time = depths['t'].min() + 10.0*60.0 # Remove first ten minutes
@@ -32,16 +35,37 @@ early = before_time(min_time)
 late = after_time(max_time)
 depths = early.Execute(late.Execute(deep.Execute(shoal.Execute(depths))))
 endTime = time.perf_counter()
-print(depths)
 print(f'Filters:              {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
+print('\nAfter filtering, source data are:')
+with pandas.option_context('display.float_format', '{:.6f}'.format):
+    print(depths)
 
 startTime = time.perf_counter()
-seattle = SingleStation('9447130')
-seattle.preload(depths)
+single_station_wl = SingleStation('8726347')
+single_station_wl.preload(depths)
 endTime = time.perf_counter()
 print(f'PreloadSingleStation: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
 startTime = time.perf_counter()
-depths = seattle.correct(depths)
+zone_tide_wl = ZoneTides('/Users/brc/Projects-Extras/OpenVBI/ExampleData/NOAA_tide_zones/tide_zone_polygons_new_WGS84_merge.shp')
+zone_tide_wl.preload(depths)
 endTime = time.perf_counter()
-print(f'Correct:              {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
+print(f'PreloadZoneStation:   {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
+
+src_depths = depths.copy()
+startTime = time.perf_counter()
+single_station_wl.correct(src_depths)
+endTime = time.perf_counter()
+print(f'CorrectSingleStation: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
+print('\nAfter single-station correction, depths are')
+with pandas.option_context('display.float_format', '{:.6f}'.format):
+    print(src_depths)
+
+src_depths = depths.copy()
+startTime = time.perf_counter()
+zone_tide_wl.correct(src_depths)
+endTime = time.perf_counter()
+print(f'CorrectZoneTides:     {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
+print('\nAfter zone-tide correction, depths are:')
+with pandas.option_context('display.float_format', '{:.6f}'.format):
+    print(src_depths)

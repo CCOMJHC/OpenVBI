@@ -35,8 +35,8 @@ from openvbi.core.interpolation import InterpTable
 def get_noaa_station(stationName: str, startTime: float, endTime: float) -> pandas.DataFrame:
     base_url = "https://tidesandcurrents.noaa.gov/api/datagetter"
     params = {
-        "begin_date": dt.datetime.fromtimestamp(startTime).strftime('%Y%m%d %H:%M'),
-        "end_date": dt.datetime.fromtimestamp(endTime).strftime('%Y%m%d %H:%M'),
+        "begin_date": dt.datetime.utcfromtimestamp(startTime).strftime('%Y%m%d %H:%M'),
+        "end_date": dt.datetime.utcfromtimestamp(endTime).strftime('%Y%m%d %H:%M'),
         "station": stationName,
         "product": "predictions",
         "datum": "MLLW",
@@ -71,6 +71,7 @@ def get_noaa_station(stationName: str, startTime: float, endTime: float) -> pand
 class SingleStation(Waterlevel):
     def __init__(self, stationName: str) -> None:
         self._stationID = stationName
+        super().__init__()
 
     def preload(self, observations: geopandas.GeoDataFrame) -> None:
         startTime = observations['t'].min()
@@ -84,20 +85,43 @@ class SingleStation(Waterlevel):
             for n in range(len(raw_levels)):
                 self._corrector.add_point(raw_levels['t'][n].timestamp(), 'dz', raw_levels['v'][n])
 
-    def correct(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+    def correct(self, observations: geopandas.GeoDataFrame) -> None:
         if self._corrector is None:
             print(f'Error: no station corrections are available.')
             return None
         corrections = self._corrector.interpolate(['dz',], observations['t'])[0]
         observations['z'] -= corrections
-        return observations
 
 class ZoneTides(Waterlevel):
-    def __init__(self, zonefile: str) -> None:
-        pass
+    def __init__(self, zone_shapefile: str) -> None:
+        self._zones = geopandas.read_file(zone_shapefile)
+        super().__init__()
 
     def preload(self, observations: geopandas.GeoDataFrame) -> None:
-        pass
+        # Spatial join to determine which polygon each observation is in (and hence which station controls)
+        annotated_pts = geopandas.sjoin(observations, self._zones, how='inner', predicate='within')
+        # List of all required stations
+        self._stations = annotated_pts['ControlStn'].unique()
+        self._tides = dict()
+        # For each station, we need to determine the time bounds of the observations affected, then
+        # call the CO-OPS API to get the waterlevel corrections; these are stored until it's time to
+        # do the corrections for some/all of the observations
+        for station in self._stations:
+            station_times = annotated_pts[annotated_pts['ControlStn'] == station]['t']
+            min_time = station_times.min() - 10*60
+            max_time = station_times.max() + 10*60
+            raw_levels = get_noaa_station(station, min_time, max_time)
+            corrections = InterpTable(['dz',])
+            for n in range(len(raw_levels)):
+                corrections.add_point(raw_levels['t'][n].timestamp(), 'dz', raw_levels['v'][n])
+            self._tides[station] = { 'min': min_time, 'max': max_time, 'raw': raw_levels, 'table': corrections }
 
-    def correct(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-        pass
+    def correct(self, observations: geopandas.GeoDataFrame) -> None:
+        # Spatial join to determine which polygon each observation is in (and hence which station controls)
+        annotated_pts = geopandas.sjoin(observations, self._zones, how='inner', predicate='within')
+        for station, data in self._tides.items():
+            station_points = annotated_pts[annotated_pts['ControlStn'] == station]
+            lut_times = station_points['t'] - station_points['ATCorr']*60
+            wl_corr = data['table'].interpolate(['dz',], lut_times)[0]
+            station_points['z'] -= station_points['RR']*wl_corr
+            observations.loc[station_points.index, 'z'] = station_points['z']
