@@ -28,6 +28,7 @@ from typing import List, Any, Dict
 from openvbi.core.types import PktStats, TimeSource
 from openvbi.core.observations import RawObs
 from openvbi.core.interpolation import InterpTable
+from openvbi.core.metadata import Metadata
 
 @dataclass
 class Dataset:
@@ -35,7 +36,7 @@ class Dataset:
     stats:      PktStats
     timesrc:    TimeSource
     timebase:   InterpTable
-    meta:       Dict[str,Any]
+    meta:       Metadata
 
     def __init__(self):
         self.packets = list()

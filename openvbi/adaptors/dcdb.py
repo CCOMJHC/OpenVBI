@@ -27,6 +27,7 @@ from typing import Dict,Tuple,Any
 import geopandas
 import pandas
 import numpy as np
+from openvbi.core.metadata import Metadata, VerticalReference, VerticalReferencePosition
 
 def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, Dict[str,Any]]:
     data = geopandas.read_file(filename)
@@ -36,10 +37,14 @@ def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, Dict[str,Any]]
     logger_uuid = data['UNIQUE_ID'].unique()[0]
     file_uuid = data['FILE_UUID'].unique()[0]
     ship_name = data['PLATFORM_NAME'].unique()[0]
+    provider = data['PROVIDER'].unique()[0]
     
     data = data.drop(columns=['TIME', 'UNIQUE_ID','FILE_UUID', 'PROVIDER', 'PLATFORM_NAME'])
     data = data.astype({'z':'float'})
     data = data.dropna(subset=['t'])
 
-    meta = {'LoggerUUID': logger_uuid, 'FileUUID': file_uuid, 'ShipName': ship_name}
+    meta = Metadata(provider, 'UNKNOWN')
+    meta.setIdentifiers(logger_uuid, 'UNKNOWN', 'UNKNOWN')
+    meta.setReferencing(VerticalReference.UNKNOWN, VerticalReferencePosition.GNSS)
+    meta.setVessel('UNKNOWN', ship_name, -1.0)
     return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
