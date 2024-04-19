@@ -24,11 +24,10 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 import struct
-from typing import Tuple, Union
-from openvbi.adaptors import Dataset
-from openvbi.core.observations import RawN2000Obs, BadData
+from typing import Tuple
+from openvbi.core.observations import RawN2000Obs, BadData, Dataset
 from openvbi.core.statistics import PktFaults
-import openvbi.timestamping.timebase as timebase
+from openvbi.core.timebase import determine_time_source, generate_timebase
 from marulc.nmea2000 import get_description_for_pgn
 from marulc.exceptions import ParseError
 
@@ -141,7 +140,7 @@ def load_data(filename: str) -> Dataset:
                 data.stats.Observed(pkt_name)
                 data.stats.Fault(pkt_name, PktFaults.DecodeFault)
     
-    data.timesrc = timebase.determine_timesource(data.stats)
-    data.timebase = timebase.generate_timebase(data.packets, data.timesrc)
+    data.timesrc = determine_time_source(data.stats)
+    data.timebase = generate_timebase(data.packets, data.timesrc)
 
     return data

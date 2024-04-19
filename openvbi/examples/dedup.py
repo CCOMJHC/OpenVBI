@@ -1,8 +1,6 @@
 import time
 import pandas
 import geopandas
-from openvbi.adaptors.generic_ascii import load_data
-from openvbi.timestamping.obs import generate_observations
 from openvbi.filters.deduplicate import deduplicate
 
 startTime = time.perf_counter()

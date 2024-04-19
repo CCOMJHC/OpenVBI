@@ -1,6 +1,5 @@
 import uuid
 from openvbi.adaptors.ydvr import load_data
-from openvbi.timestamping.obs import generate_observations
 import openvbi.core.metadata as md
 from openvbi.adaptors.dcdb import write_geojson
 
@@ -30,10 +29,10 @@ data.meta.setReferencing(md.VerticalReference.TRANSDUCER, md.VerticalReferencePo
 data.meta.setVesselID(md.VesselIdentifier.MMSI, "000000000")
 
 # YachtDevices is a NMEA2000 device, so we convert 'Depth' messages for depth information
-depths, data.meta = generate_observations(data, 'Depth')
+data.generate_observations('Depth')
 
 # Finally, write the output to a DCDB-compatible, IHO CSBWG B.12 GeoJSON file.  Note that the
 # keyword parameters here are passed on to json.dump() directly, so you can control the output
 # a little more directly.  Using "indent" here gives something that's more verbose but easier
 # to read.
-write_geojson(data.meta, depths, '00030095.json', indent=2)
+write_geojson(data.meta, data.depths, '00030095.json', indent=2)

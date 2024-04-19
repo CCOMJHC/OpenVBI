@@ -22,25 +22,3 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-
-from dataclasses import dataclass
-from typing import List, Any, Dict
-from openvbi.core.types import PktStats, TimeSource
-from openvbi.core.observations import RawObs
-from openvbi.core.interpolation import InterpTable
-from openvbi.core.metadata import Metadata
-
-@dataclass
-class Dataset:
-    packets:    List[RawObs]
-    stats:      PktStats
-    timesrc:    TimeSource
-    timebase:   InterpTable
-    meta:       Metadata
-
-    def __init__(self):
-        self.packets = list()
-        self.stats = PktStats(fault_limit=10)
-        self.timesrc = None
-        self.timebase = None
-        self.meta = Metadata()

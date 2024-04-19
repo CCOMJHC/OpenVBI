@@ -24,7 +24,7 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from enum import Enum
-from openvbi.core.statistics import PktStats
+from abc import ABC, abstractmethod
 
 ## Encapsulate the types of real-world time information that can be used
 #
@@ -46,38 +46,32 @@ class TimeSource(Enum):
 class NoTimeSource(Exception):
     pass
 
-## Work out which time source should be used for real time associations
-#
-# There are multiple potential ways to assign a correspondence between measures of
-# elapsed time and the timestamps that are available in the source observations (e.g.,
-# from ZDA or RMC strings, or NMEA2000 System Time or GNSS packets).  All of these
-# mechanisms can be used, but in general we prefer to use System Time if available,
-# then GNSS (since NMEA2000 arrives faster, it should have lower latency that NMEA0183),
-# but then will use either ZDA, or as a last resort RMC from NMEA0183 packets.  This
-# code translates the available packets into an enum for further reference.
+class RawObs(ABC):
+    def __init__(self, elapsed: float, name: str, hastime: bool) -> None:
+        self._elapsed = elapsed
+        self._name = name
+        self._hastime = hastime
+    
+    def Name(self) -> str:
+        return self._name
+    
+    def Elapsed(self) -> float:
+        return self._elapsed
 
-def determine_time_source(stats: PktStats) -> TimeSource:
-    """Work out which source of time can be used to provide the translation between
-       elapsed time (local time-stamps that indicate a monotonic clock tick at the
-       logger when the packet is received) to a real world time.  The preference is
-       to use NMEA2000 system time packets, but then to attempt to use GNSS packets,
-       and then finally to drop back to NMEA0183 ZDA or RMC packets (in that order)
-       if required.
+    def SetElapsed(self, elapsed: float) -> None:
+        self._elapsed = elapsed
+    
+    def HasTime(self) -> bool:
+        return self._hastime
+    
+    @abstractmethod
+    def MatchesTimeSource(self, source: TimeSource) -> bool:
+        pass
 
-        Inputs:
-            stats   (PktStats) Statistics on which packets have been seen in the data
-        
-        Outputs:
-            TimeSource enum for which source should be used for timestamping
-    """
-    if stats.Seen('SystemTime'):
-        rtn = TimeSource.Time_SysTime
-    elif stats.Seen('GNSS'):
-        rtn = TimeSource.Time_GNSS
-    elif stats.Seen('ZDA'):
-        rtn = TimeSource.Time_ZDA
-    elif stats.Seen('RMC'):
-        rtn = TimeSource.Time_RMC
-    else:
-        raise NoTimeSource()
-    return rtn
+    @abstractmethod
+    def Timestamp(self) -> float:
+        pass
+
+class NoDepths(RuntimeError):
+    pass
+

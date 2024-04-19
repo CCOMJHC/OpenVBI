@@ -23,10 +23,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from openvbi.core.observations import RawN0183Obs, BadData
-from openvbi.core.statistics import PktStats
-from openvbi.adaptors import Dataset
-import openvbi.timestamping.timebase as timebase
+from openvbi.core.observations import RawN0183Obs, BadData, Dataset
+from openvbi.core.timebase import determine_time_source, generate_timebase
 
 def load_data(filename: str) -> Dataset:
     rtn: Dataset = Dataset()
@@ -39,7 +37,7 @@ def load_data(filename: str) -> Dataset:
                 rtn.stats.Observed(obs.Name())
             except BadData:
                 pass
-    rtn.timesrc = timebase.determine_timesource(rtn.stats)
+    rtn.timesrc = determine_time_source(rtn.stats)
 
     # TeamSurv systems don't have elapsed time (and intermingle two streams of
     # data from the two interfaces without warning), so you can't tell when the packets
@@ -74,6 +72,6 @@ def load_data(filename: str) -> Dataset:
                 # Update position of the previous timestamp to now
                 oldest_position = n
 
-    rtn.timebase = timebase.generate_timebase(rtn.packets, rtn.timesrc)
+    rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
 
     return rtn

@@ -23,10 +23,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from openvbi.core.observations import RawN0183Obs
-from openvbi.core.statistics import PktStats
-from openvbi.adaptors import Dataset
-import openvbi.timestamping.timebase as timebase
+from openvbi.core.observations import RawN0183Obs, Dataset
+from openvbi.core.timebase import determine_time_source, generate_timebase
 
 def load_data(filename: str, maxelapsed: int) -> Dataset:
     rtn: Dataset = Dataset()
@@ -48,6 +46,6 @@ def load_data(filename: str, maxelapsed: int) -> Dataset:
             obs = RawN0183Obs(elapsed + elapsed_offset, message)
             rtn.packets.append(obs)
             rtn.stats.Observed(obs.Name())
-    rtn.timesrc = timebase.determine_timesource(rtn.stats)
-    rtn.timebase = timebase.generate_timebase(rtn.packets, rtn.timesrc)
+    rtn.timesrc = determine_time_source(rtn.stats)
+    rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
     return rtn
