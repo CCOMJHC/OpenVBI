@@ -27,9 +27,11 @@ from typing import Dict,Tuple,Any
 import geopandas
 import pandas
 import numpy as np
-from openvbi.core.metadata import Metadata, VerticalReference, VerticalReferencePosition
+import json
+from datetime import datetime, timezone
+import openvbi.core.metadata as md
 
-def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, Dict[str,Any]]:
+def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
     data = geopandas.read_file(filename)
     data = data.rename(columns={'DEPTH': 'z', 'LON': 'lon', 'LAT': 'lat'})
     data['t'] = np.fromiter((t.timestamp() for t in pandas.to_datetime(data['TIME'])), dtype='float')
@@ -43,8 +45,35 @@ def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, Dict[str,Any]]
     data = data.astype({'z':'float'})
     data = data.dropna(subset=['t'])
 
-    meta = Metadata(provider, 'UNKNOWN')
+    meta = md.Metadata(provider, 'UNKNOWN')
     meta.setIdentifiers(logger_uuid, 'UNKNOWN', 'UNKNOWN')
-    meta.setReferencing(VerticalReference.UNKNOWN, VerticalReferencePosition.GNSS)
+    meta.setReferencing(md.VerticalReference.UNKNOWN, md.VerticalReferencePosition.GNSS)
     meta.setVessel('UNKNOWN', ship_name, -1.0)
+
     return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
+
+def write_geojson(meta: md.Metadata, depths: geopandas.GeoDataFrame, filename: str) -> None:
+    FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
+    feature_lst = []
+    for n in range(len(depths)):
+        timestamp = datetime.fromtimestamp(depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
+        feature = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    depths['lon'].iloc[n],
+                    depths['lat'].iloc[n]
+                ]
+            },
+            "properties": {
+                "depth": depths['z'].iloc[n],
+                "uncertainty": depths['u'].iloc[n],
+                "time": timestamp
+            }
+        }
+        feature_lst.append(dict(feature))
+    data = meta.metadata()
+    data['features'] = feature_lst
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=2)

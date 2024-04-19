@@ -25,15 +25,18 @@
 
 import pandas
 import geopandas
+from typing import Tuple, Dict, Any
 from openvbi.core.observations import RawObs
 from openvbi.core.types import TimeSource
 from openvbi.core.interpolation import InterpTable
+import openvbi.core.metadata as md
 from openvbi.adaptors import Dataset
+from openvbi import version
 
 class NoDepths(RuntimeError):
     pass
 
-def generate_observations(dataset: Dataset, depth: str) -> geopandas.GeoDataFrame:
+def generate_observations(dataset: Dataset, depth: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
     depth_table = InterpTable(['z',])
     position_table = InterpTable(['lon', 'lat'])
 
@@ -70,5 +73,13 @@ def generate_observations(dataset: Dataset, depth: str) -> geopandas.GeoDataFram
     
     data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
     for n in range(depth_table.n_points()):
-        data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], -1.0]
-    return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
+        data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], [-1.0, -1.0, -1.0]]
+
+    if dataset.meta is None:
+        # Metadata hasn't been set yet, so we generate a default input
+        dataset.meta = md.Metadata('UNKNOWN', 'invalid@unknown.org')
+    dataset.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, None, method='Linear Interpolation', algorithm='OpenVBI', version=version())
+    dataset.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, None, name='OpenVBI Default Uncertainty', parameters={}, version=version(), comment='Default (non-valid) uncertainty', reference='None')
+    dataset.meta.setProcessingFlags(False, False, True)
+    
+    return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), dataset.meta

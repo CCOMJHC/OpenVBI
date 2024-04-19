@@ -35,5 +35,5 @@ class Waterlevel(ABC):
         pass
 
     @abstractmethod
-    def correct(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+    def correct(self, observations: geopandas.GeoDataFrame) -> None:
         pass

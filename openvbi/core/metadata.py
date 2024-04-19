@@ -33,11 +33,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Dict, Any, Tuple, Union
+from typing import Dict, Any, Tuple, Union, List
 from pathlib import Path
 from enum import StrEnum
 import datetime as dt
 import tempfile
+import os
 import json
 from csbschema.validators import validate_b12_3_1_0_2023_08
 
@@ -61,10 +62,10 @@ mandatoryMetadata = {
             'navigationCRS': 'EPSG:4326',
             'verticalReferenceOfDepth': 'NOTSET',
             'vesselPositionReferencePoint': 'NOTSET'
+        },
+        'platform': {
+            'uniqueID': 'NOTSET'
         }
-    },
-    'platform': {
-        'uniqueID': 'NOTSET'
     }
 }
 
@@ -103,7 +104,7 @@ class Metadata:
     
     def setIdentifiers(self, uniqueID: str, logger: str, loggerVersion: str) -> None:
         self.meta['properties']['trustedNode']['uniqueVesselID'] = uniqueID
-        self.meta['platform']['uniqueID'] = uniqueID
+        self.meta['properties']['platform']['uniqueID'] = uniqueID
         self.meta['properties']['trustedNode']['providerLogger'] = logger
         self.meta['properties']['trustedNode']['providerLoggerVersion'] = loggerVersion
     
@@ -164,12 +165,14 @@ class Metadata:
         return value
 
     def setComment(self, comment: str) -> None:
-        self.meta['properties']['contributorComments'] = comment
+        self.meta['properties']['platform']['contributorComments'] = comment
     
     def addProcessingAction(self, procType: ProcessingType, timestamp: dt.datetime, **kwargs) -> None:
         element = dict()
         element['type'] = procType
-        element['timestamp'] = timestamp.isoformat()
+        if timestamp is None:
+            timestamp = dt.datetime.utcnow()
+        element['timestamp'] = timestamp.isoformat() + 'Z'
         if procType == ProcessingType.TIMESTAMP:
             if 'method' not in kwargs:
                 raise ValueError()
@@ -235,8 +238,10 @@ class Metadata:
         self.meta['properties']['processing'].append(element)
 
     def render(self, filename: Union[Path,str]) -> None:
-        with open(filename, 'wb') as f:
-            json.dump(self.meta, f)
+        metadata = self.meta
+        metadata['features'] = []
+        with open(filename, 'w') as f:
+            json.dump(metadata, f)
 
     def metadata(self) -> Dict[str,Any]:
         return self.meta
@@ -245,7 +250,7 @@ class Metadata:
         # Since the validator doesn't accept in-memory dictionaries, we have to render the
         # internal structure to a file
         fd, filename = tempfile.mkstemp(suffix='json')
-        fd.close()
+        os.close(fd)
         filepath = Path(filename)
         self.render(filepath)
         (valid, result) = validate_b12_3_1_0_2023_08(filepath)
@@ -253,7 +258,7 @@ class Metadata:
         if valid:
             return valid, None
         else:
-            return valid, results['errors']
+            return valid, result['errors']
 
     def adopt(self, metadata: Dict[str,Any]) -> None:
         if 'type' not in metadata or 'crs' not in metadata or 'properties' not in metadata or 'platform' not in metadata:

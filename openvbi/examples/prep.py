@@ -12,7 +12,7 @@ endTime = time.perf_counter()
 print(f'LoadData:             {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
 startTime = time.perf_counter()
-depths = generate_observations(data, 'Depth')
+depths, data.meta = generate_observations(data, 'Depth')
 endTime = time.perf_counter()
 print(f'GenerateObservations: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 

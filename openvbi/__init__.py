@@ -24,3 +24,6 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 __version__ = '1.0.0'
+
+def version() -> str:
+    return __version__
