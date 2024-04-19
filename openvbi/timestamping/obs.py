@@ -77,7 +77,7 @@ def generate_observations(dataset: Dataset, depth: str) -> Tuple[geopandas.GeoDa
 
     if dataset.meta is None:
         # Metadata hasn't been set yet, so we generate a default input
-        dataset.meta = md.Metadata('UNKNOWN', 'invalid@unknown.org')
+        dataset.meta = md.Metadata()
     dataset.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, None, method='Linear Interpolation', algorithm='OpenVBI', version=version())
     dataset.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, None, name='OpenVBI Default Uncertainty', parameters={}, version=version(), comment='Default (non-valid) uncertainty', reference='None')
     dataset.meta.setProcessingFlags(False, False, True)

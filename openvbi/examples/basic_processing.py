@@ -23,7 +23,8 @@ data = load_data('/Users/brc/Projects-Extras/OpenVBI/ExampleData/00030095.DAT')
 # metadata separately.  We focus here on the mandatory metadata.  In practice, you would probably want
 # to look up the unique identifier in a database of loggers, and pick out the appropriate metadata (or
 # potentially a pre-formatted object).
-data.meta = md.Metadata(provider_id, provider_email)
+data.meta = md.Metadata()
+data.meta.setProviderID(provider_id, provider_email)
 data.meta.setIdentifiers(unique_id, 'YDVR', '1.0')
 data.meta.setReferencing(md.VerticalReference.TRANSDUCER, md.VerticalReferencePosition.GNSS)
 data.meta.setVesselID(md.VesselIdentifier.MMSI, "000000000")
@@ -31,5 +32,8 @@ data.meta.setVesselID(md.VesselIdentifier.MMSI, "000000000")
 # YachtDevices is a NMEA2000 device, so we convert 'Depth' messages for depth information
 depths, data.meta = generate_observations(data, 'Depth')
 
-# Finally, write the output to a DCDB-compatible, IHO CSBWG B.12 GeoJSON file.abs
-write_geojson(data.meta, depths, '00030095.json')
+# Finally, write the output to a DCDB-compatible, IHO CSBWG B.12 GeoJSON file.  Note that the
+# keyword parameters here are passed on to json.dump() directly, so you can control the output
+# a little more directly.  Using "indent" here gives something that's more verbose but easier
+# to read.
+write_geojson(data.meta, depths, '00030095.json', indent=2)

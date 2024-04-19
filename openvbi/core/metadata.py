@@ -97,8 +97,10 @@ class ProcessingType(StrEnum):
     ALGORITHM = 'Algorithm'
 
 class Metadata:
-    def __init__(self, providerName: str, providerEmail: str) -> None:
+    def __init__(self) -> None:
         self.meta = mandatoryMetadata
+
+    def setProviderID(self, providerName: str, providerEmail: str) -> None:
         self.meta['properties']['trustedNode']['providerOrganizationName'] = providerName
         self.meta['properties']['trustedNode']['providerEmail'] = providerEmail
     

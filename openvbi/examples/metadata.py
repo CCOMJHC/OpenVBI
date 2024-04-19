@@ -13,7 +13,8 @@ def report_metadata(m: md.Metadata, tag: str) -> None:
 
 # The provider name and e-mail are set by default at construction.  Note that
 # this specific e-mail is not functional!
-metadata = md.Metadata("OpenVBI", "hello@openvbi.org")
+metadata = md.Metadata()
+metadata.setProviderID("OpenVBI", "hello@openvbi.org")
 
 # The unique ID for the logger should start with the DCDB TrustedNode ID, typically
 # 5-6 characters, a hyphen, and then a UUID4.  This needs to stay unique to the logger

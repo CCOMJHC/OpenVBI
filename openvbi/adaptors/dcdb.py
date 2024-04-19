@@ -45,14 +45,15 @@ def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
     data = data.astype({'z':'float'})
     data = data.dropna(subset=['t'])
 
-    meta = md.Metadata(provider, 'UNKNOWN')
+    meta = md.Metadata()
+    meta.setProviderID(provider, 'UNKNOWN')
     meta.setIdentifiers(logger_uuid, 'UNKNOWN', 'UNKNOWN')
     meta.setReferencing(md.VerticalReference.UNKNOWN, md.VerticalReferencePosition.GNSS)
     meta.setVessel('UNKNOWN', ship_name, -1.0)
 
     return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
 
-def write_geojson(meta: md.Metadata, depths: geopandas.GeoDataFrame, filename: str) -> None:
+def write_geojson(meta: md.Metadata, depths: geopandas.GeoDataFrame, filename: str, **kwargs) -> None:
     FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
     feature_lst = []
     for n in range(len(depths)):
@@ -76,4 +77,4 @@ def write_geojson(meta: md.Metadata, depths: geopandas.GeoDataFrame, filename: s
     data = meta.metadata()
     data['features'] = feature_lst
     with open(filename, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, **kwargs)

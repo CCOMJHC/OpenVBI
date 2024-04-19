@@ -43,4 +43,4 @@ class Dataset:
         self.stats = PktStats(fault_limit=10)
         self.timesrc = None
         self.timebase = None
-        self.meta = None
+        self.meta = Metadata()
