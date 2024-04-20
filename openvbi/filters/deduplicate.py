@@ -24,14 +24,17 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 import geopandas
+from openvbi.core.observations import Dataset
+import openvbi.core.metadata as md
 from openvbi.filters import Filter
+from openvbi import version
 
 class deduplicate(Filter):
     def __init__(self, verbose: bool) -> None:
         self._verbose = verbose
         super().__init__()
 
-    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+    def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         current_depth: float = 0
         out_index = []
         n_in: int = len(dataset)
@@ -39,6 +42,13 @@ class deduplicate(Filter):
             if dataset['z'][n] != current_depth:
                 out_index.append(n)
                 current_depth = dataset['z'][n]
-        if self._verbose:
-            print(f'After deduplication, total {len(out_index)} points selected from {n_in}.')
+        self.n_inputs = n_in
+        self.n_outputs = len(out_index)
         return dataset.iloc[out_index]
+
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+            name='Deduplicate',
+            source='OpenVBI',
+            version=version(),
+            comment=f'After deduplication, total {self.n_outputs} points selected from {self.n_inputs}.')

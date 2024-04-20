@@ -88,7 +88,7 @@ class SensorType(StrEnum):
     GNSS = 'GNSS'
 
 class ProcessingType(StrEnum):
-    TIMESTAMP = 'TimestampInterpolation'
+    TIMESTAMP = 'TimeStampInterpolation'
     COORDCHANGE = 'CRSChange'
     VERTREDUCTION = 'VerticalReduction'
     GNSSPROC = 'GNSS'
@@ -198,6 +198,11 @@ class Metadata:
             if kwargs['method'] not in ['Ellipsoid Reduction', 'Observed Waterlevel', 'Predicted Waterlevel']:
                 raise ValueError()
             element['method'] = kwargs['method']
+            if 'algorithm' in kwargs:
+                element['algorithm'] = kwargs['algorithm']
+                if 'version' not in kwargs:
+                    raise ValueError()
+                element['version'] = kwargs['version']
             if 'model' in kwargs:
                 element['model'] = kwargs['model']
         elif procType == ProcessingType.GNSSPROC:
@@ -255,6 +260,7 @@ class Metadata:
         os.close(fd)
         filepath = Path(filename)
         self.render(filepath)
+        # (valid, result) = validate_b12_3_1_0_2024_04(filepath)
         (valid, result) = validate_b12_3_1_0_2023_08(filepath)
         filepath.unlink()
         if valid:

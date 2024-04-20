@@ -24,7 +24,10 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 import geopandas
+from openvbi.core.observations import Dataset
+import openvbi.core.metadata as md
 from openvbi.filters import Filter
+from openvbi import version
 
 # Remove any points that are shoaler than the threshold specified
 class shoaler_than(Filter):
@@ -32,9 +35,18 @@ class shoaler_than(Filter):
         self._threshold = threshold
         super().__init__()
     
-    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-        out = dataset[dataset['z'] > self._threshold]
-        return out
+    def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        self.n_inputs = len(dataset)
+        dataset = dataset[dataset['z'] > self._threshold]
+        self.n_outputs = len(dataset)
+        return dataset
+
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+            name='ShoalDepth Filter',
+            source='OpenVBI',
+            version=version(),
+            comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 # Remove any points that are deeper than the threshold specified
 class deeper_than(Filter):
@@ -42,6 +54,15 @@ class deeper_than(Filter):
         self._threshold = threshold
         super().__init__()
 
-    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-        out = dataset[dataset['z'] < self._threshold]
-        return out
+    def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        self.n_inputs = len(dataset)
+        dataset = dataset[dataset['z'] < self._threshold]
+        self.n_outputs = len(dataset)
+        return dataset
+
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+            name='DeepDepth Filter',
+            source='OpenVBI',
+            version=version(),
+            comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')

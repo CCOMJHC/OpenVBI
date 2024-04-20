@@ -31,6 +31,9 @@ import datetime as dt
 import requests
 from openvbi.corrections.waterlevel import Waterlevel
 from openvbi.core.interpolation import InterpTable
+import openvbi.core.metadata as md
+from openvbi.core.observations import Dataset
+from openvbi import version
 
 def get_noaa_station(stationName: str, startTime: float, endTime: float) -> pandas.DataFrame:
     base_url = "https://tidesandcurrents.noaa.gov/api/datagetter"
@@ -73,9 +76,9 @@ class SingleStation(Waterlevel):
         self._stationID = stationName
         super().__init__()
 
-    def preload(self, observations: geopandas.GeoDataFrame) -> None:
-        startTime = observations['t'].min()
-        endTime = observations['t'].max()
+    def preload(self, dataset: Dataset) -> None:
+        startTime = dataset.depths['t'].min()
+        endTime = dataset.depths['t'].max()
         raw_levels = get_noaa_station(self._stationID, startTime, endTime)
         if raw_levels is None:
             print(f'Error: station failed to resolve waterlevels for time range [{startTime.isoformat()}, {endTime.isoformat()}].')
@@ -85,21 +88,31 @@ class SingleStation(Waterlevel):
             for n in range(len(raw_levels)):
                 self._corrector.add_point(raw_levels['t'][n].timestamp(), 'dz', raw_levels['v'][n])
 
-    def correct(self, observations: geopandas.GeoDataFrame) -> None:
+    def _execute(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         if self._corrector is None:
             print(f'Error: no station corrections are available.')
             return None
         corrections = self._corrector.interpolate(['dz',], observations['t'])[0]
         observations['z'] -= corrections
+        return observations
+    
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, None,
+            reference='ChartDatum',
+            datum='MLLW',
+            method='Observed Waterlevel',
+            algorithm='OpenVBI',
+            version=version(),
+            model=f'NOAA Single Station with ID {self._stationID}')
 
 class ZoneTides(Waterlevel):
     def __init__(self, zone_shapefile: str) -> None:
         self._zones = geopandas.read_file(zone_shapefile)
         super().__init__()
 
-    def preload(self, observations: geopandas.GeoDataFrame) -> None:
+    def preload(self, dataset: Dataset) -> None:
         # Spatial join to determine which polygon each observation is in (and hence which station controls)
-        annotated_pts = geopandas.sjoin(observations, self._zones, how='inner', predicate='within')
+        annotated_pts = geopandas.sjoin(dataset.depths, self._zones, how='inner', predicate='within')
         # List of all required stations
         self._stations = annotated_pts['ControlStn'].unique()
         self._tides = dict()
@@ -116,7 +129,7 @@ class ZoneTides(Waterlevel):
                 corrections.add_point(raw_levels['t'][n].timestamp(), 'dz', raw_levels['v'][n])
             self._tides[station] = { 'min': min_time, 'max': max_time, 'raw': raw_levels, 'table': corrections }
 
-    def correct(self, observations: geopandas.GeoDataFrame) -> None:
+    def _execute(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         # Spatial join to determine which polygon each observation is in (and hence which station controls)
         annotated_pts = geopandas.sjoin(observations, self._zones, how='inner', predicate='within')
         for station, data in self._tides.items():
@@ -125,3 +138,13 @@ class ZoneTides(Waterlevel):
             wl_corr = data['table'].interpolate(['dz',], lut_times)[0]
             station_points['z'] -= station_points['RR']*wl_corr
             observations.loc[station_points.index, 'z'] = station_points['z']
+        return observations
+
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, None,
+            reference='ChartDatum',
+            datum='MLLW',
+            method='Observed Waterlevel',
+            algorithm='OpenVBI',
+            version=version(),
+            model = f'NOAA Zoned Tides with stations {self._stations}')

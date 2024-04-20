@@ -142,5 +142,6 @@ def load_data(filename: str) -> Dataset:
     
     data.timesrc = determine_time_source(data.stats)
     data.timebase = generate_timebase(data.packets, data.timesrc)
+    data.meta.setIdentifiers('NOTSET', 'YachtDevices YDVR4', '1.0')
 
     return data

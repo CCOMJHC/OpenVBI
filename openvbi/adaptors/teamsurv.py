@@ -73,5 +73,6 @@ def load_data(filename: str) -> Dataset:
                 oldest_position = n
 
     rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
+    rtn.meta.setIdentifiers('NOSET', 'TeamSurv SmartLogger', '1.0')
 
     return rtn

@@ -35,6 +35,7 @@ import bitstruct
 from openvbi.core.types import TimeSource, RawObs, NoDepths
 from openvbi.core.statistics import PktStats
 from openvbi.core.interpolation import InterpTable
+from openvbi.core.timebase import determine_time_source, generate_timebase
 import openvbi.core.metadata as md
 from openvbi import version
 
@@ -194,6 +195,15 @@ class Dataset:
         self.timebase = None
         self.meta = md.Metadata()
         self.depths = None
+
+    def add_timebase(self) -> None:
+        '''This determines, given a list ot raw packets, which time source should be used for
+        generating the time lookup tables, and then generates the lookup table from the relevant
+        messages using this source.  This is typically done by the loader code in openvbi.adaptors
+        but is included here for completeness.
+        '''
+        self.timesrc = determine_time_source(self.stats)
+        self.timebase = generate_timebase(self.packets, self.timesrc)
     
     def generate_observations(self, depth: str) -> None:
         depth_table = InterpTable(['z',])

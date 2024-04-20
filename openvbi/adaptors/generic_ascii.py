@@ -48,4 +48,5 @@ def load_data(filename: str, maxelapsed: int) -> Dataset:
             rtn.stats.Observed(obs.Name())
     rtn.timesrc = determine_time_source(rtn.stats)
     rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
+    rtn.meta.setIdentifiers('NOTSET', 'Generic ASCII Inputs', '1.0')
     return rtn

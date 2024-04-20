@@ -25,20 +25,43 @@
 
 import datetime as dt
 import geopandas
+from openvbi.core.observations import Dataset
+import openvbi.core.metadata as md
 from openvbi.filters import Filter
+from openvbi import version
 
 class before_time(Filter):
     def __init__(self, timepoint: float) -> None:
         self._threshold = timepoint
         super().__init__()
 
-    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-        return dataset[dataset['t'] < self._threshold]
+    def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        self.n_inputs = len(dataset)
+        dataset = dataset[dataset['t'] < self._threshold]
+        self.n_outputs = len(dataset)
+        return dataset
+    
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+            name='BeforeTime Filter',
+            source='OpenVBI',
+            version=version(),
+            comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 class after_time(Filter):
     def __init__(self, timepoint: float) -> None:
         self._threshold = timepoint
         super().__init__()
 
-    def Execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-        return dataset[dataset['t'] > self._threshold]
+    def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
+        self.n_inputs = len(dataset)
+        dataset = dataset[dataset['t'] > self._threshold]
+        self.n_outputs = len(dataset)
+        return dataset
+
+    def _metadata(self, meta: md.Metadata) -> None:
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+            name='AfterTime Filter',
+            source='OpenVBI',
+            version=version(),
+            comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')

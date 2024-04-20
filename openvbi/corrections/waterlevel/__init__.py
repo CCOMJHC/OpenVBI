@@ -25,15 +25,26 @@
 
 from abc import ABC, abstractmethod
 import geopandas
+from openvbi.core.observations import Dataset
+import openvbi.core.metadata as md
 
 class Waterlevel(ABC):
     def __init__(self):
         pass
 
     @abstractmethod
-    def preload(self, observations: geopandas.GeoDataFrame) -> None:
+    def preload(self, dataset: Dataset) -> None:
+        pass
+
+    def correct(self, dataset: Dataset) -> Dataset:
+        dataset.depths = self._execute(dataset.depths)
+        self._metadata(dataset.meta)
+        return dataset
+
+    @abstractmethod
+    def _execute(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         pass
 
     @abstractmethod
-    def correct(self, observations: geopandas.GeoDataFrame) -> None:
+    def _metadata(self, meta: md.Metadata) -> None:
         pass
