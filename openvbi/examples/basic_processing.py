@@ -35,4 +35,4 @@ data.generate_observations('Depth')
 # keyword parameters here are passed on to json.dump() directly, so you can control the output
 # a little more directly.  Using "indent" here gives something that's more verbose but easier
 # to read.
-write_geojson(data.meta, data.depths, '00030095.json', indent=2)
+write_geojson(data, '00030095.json', indent=2)

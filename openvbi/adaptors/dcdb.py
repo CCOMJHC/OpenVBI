@@ -30,6 +30,7 @@ import numpy as np
 import json
 from datetime import datetime, timezone
 import openvbi.core.metadata as md
+from openvbi.core.observations import Dataset
 
 def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
     data = geopandas.read_file(filename)
@@ -53,28 +54,28 @@ def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
 
     return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
 
-def write_geojson(meta: md.Metadata, depths: geopandas.GeoDataFrame, filename: str, **kwargs) -> None:
+def write_geojson(dataset: Dataset, filename: str, **kwargs) -> None:
     FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
     feature_lst = []
-    for n in range(len(depths)):
-        timestamp = datetime.fromtimestamp(depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
+    for n in range(len(dataset.depths)):
+        timestamp = datetime.fromtimestamp(dataset.depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
         feature = {
             "type": "Feature",
             "geometry": {
                 "type": "Point",
                 "coordinates": [
-                    depths['lon'].iloc[n],
-                    depths['lat'].iloc[n]
+                    dataset.depths['lon'].iloc[n],
+                    dataset.depths['lat'].iloc[n]
                 ]
             },
             "properties": {
-                "depth": depths['z'].iloc[n],
-                "uncertainty": depths['u'].iloc[n],
+                "depth": dataset.depths['z'].iloc[n],
+                "uncertainty": dataset.depths['u'].iloc[n],
                 "time": timestamp
             }
         }
         feature_lst.append(dict(feature))
-    data = meta.metadata()
+    data = dataset.meta.metadata()
     data['features'] = feature_lst
     with open(filename, 'w') as f:
         json.dump(data, f, **kwargs)
