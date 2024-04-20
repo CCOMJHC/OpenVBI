@@ -79,3 +79,12 @@ def write_geojson(dataset: Dataset, filename: str, **kwargs) -> None:
     data['features'] = feature_lst
     with open(filename, 'w') as f:
         json.dump(data, f, **kwargs)
+
+def write_csv_json(dataset: Dataset, basename: str, **kwargs) -> None:
+    working_depths = dataset.depths.copy()
+    working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
+    working_depths.to_csv(basename + '.csv', columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
+    meta = dataset.meta.metadata()
+    meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
+    with open(basename + '.json', 'w') as f:
+        json.dump(meta['properties'], f, **kwargs)

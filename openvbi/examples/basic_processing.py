@@ -1,7 +1,7 @@
 import uuid
 from openvbi.adaptors.ydvr import load_data
 import openvbi.core.metadata as md
-from openvbi.adaptors.dcdb import write_geojson
+from openvbi.adaptors.dcdb import write_geojson, write_csv_json
 
 # In order to fill out the metadata, we need a DCDB-style Trusted Node identification string,
 # and some core data for the provider and e-mail.
@@ -36,3 +36,4 @@ data.generate_observations('Depth')
 # a little more directly.  Using "indent" here gives something that's more verbose but easier
 # to read.
 write_geojson(data, '00030095.json', indent=2)
+write_csv_json(data, '00030095_copy', indent=2)
