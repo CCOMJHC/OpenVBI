@@ -25,6 +25,7 @@
 
 from enum import Enum
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 ## Encapsulate the types of real-world time information that can be used
 #
@@ -70,6 +71,14 @@ class RawObs(ABC):
 
     @abstractmethod
     def Timestamp(self) -> float:
+        pass
+
+    @abstractmethod
+    def Depth(self) -> float:
+        pass
+
+    @abstractmethod
+    def Position(self) -> Tuple[float,float]:
         pass
 
 class NoDepths(RuntimeError):

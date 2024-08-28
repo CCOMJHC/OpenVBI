@@ -23,7 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
+from typing import List, Tuple
 import datetime
 from dataclasses import dataclass
 import pandas
@@ -73,6 +73,26 @@ class RawN0183Obs(RawObs):
         time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
         reftime = base_date + time_offset
         return reftime.timestamp()
+    
+    def Depth(self) -> float:
+        if self.Name() != 'DPT' and self.Name() != 'DBT':
+            raise BadData()
+        return self._data['Fields']['depth_meters']
+
+    def Position(self) -> Tuple[float,float]:
+        if self.Name() != 'GGA':
+            raise BadData()
+        raw_lon = self._data['Fields']['lon']
+        raw_lat = self._data['Fields']['lat']
+        if not isinstance(raw_lon, float) or not isinstance(raw_lat, float):
+            raise BadData()
+        lon = int(raw_lon/100) + (raw_lon % 100)/60
+        if self._data['Fields']['lon_dir'] == 'W':
+            lon = - lon
+        lat = int(raw_lat/100) + (raw_lat % 100)/60
+        if self._data['Fields']['lat_dir'] == 'S':
+            lat = - lat
+        return (lon, lat)
     
 class RawN2000Obs(RawObs):
     def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
@@ -134,6 +154,18 @@ class RawN2000Obs(RawObs):
         else:
             return -1.0
         return timestamp
+    
+    def Depth(self) -> float:
+        if self.Name() != 'Depth':
+            raise BadData()
+        return self._data['Fields']['depth']
+
+    def Position(self) -> Tuple[float,float]:
+        if self.Name() != 'GNSS':
+            raise BadData()
+        lon = self._data['Fields']['longitude']
+        lat = self._data['Fields']['latitude']
+        return (lon, lat)
 
 def count_messages(messages: List[RawObs]) -> PktStats:
     """Determine the list of messages that are available in the input data source.
@@ -211,27 +243,9 @@ class Dataset:
 
         for obs in self.packets:
             if obs.Name() == depth and obs.Elapsed() is not None:
-                if depth == 'Depth':
-                    # NMEA2000
-                    depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth'])
-                else:
-                    # NMEA0183
-                    depth_table.add_point(obs.Elapsed(), 'z', obs._data['Fields']['depth_meters'])
-            if obs.Name() == 'GGA' and obs.Elapsed() is not None:
-                raw_lon = obs._data['Fields']['lon']
-                raw_lat = obs._data['Fields']['lat']
-                if isinstance(raw_lon, float) and isinstance(raw_lat, float):
-                    lon = raw_lon/100 + (raw_lon % 100)/60
-                    if obs._data['Fields']['lon_dir'] == 'W':
-                        lon = - lon
-                    lat = raw_lat/100 + (raw_lat % 100)/60
-                    if obs._data['Fields']['lat_dir'] == 'S':
-                        lat = - lat
-                    position_table.add_points(obs.Elapsed(), ('lon', 'lat'), (lon, lat))
-            if obs.Name() == 'GNSS' and obs.Elapsed() is not None:
-                lon = obs._data['Fields']['longitude']
-                lat = obs._data['Fields']['latitude']
-                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), (lon, lat))
+                depth_table.add_point(obs.Elapsed(), 'z', obs.Depth())
+            if obs.Name() in ('GGA','GNSS') and obs.Elapsed() is not None:
+                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
         
         depth_timepoints = depth_table.ind()
         if len(depth_timepoints) == 0:
