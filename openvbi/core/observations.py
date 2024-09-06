@@ -244,7 +244,7 @@ class Dataset:
         for obs in self.packets:
             if obs.Name() == depth and obs.Elapsed() is not None:
                 depth_table.add_point(obs.Elapsed(), 'z', obs.Depth())
-            if obs.Name() in ('GGA','GNSS') and obs.Elapsed() is not None:
+            if obs.Name() in ['GGA','GNSS'] and obs.Elapsed() is not None:
                 position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
         
         depth_timepoints = depth_table.ind()
