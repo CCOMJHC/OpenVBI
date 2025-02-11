@@ -1,6 +1,7 @@
-FROM debian:11-slim AS builder
+FROM python:3.12-slim AS builder
 RUN apt-get update -y
-RUN apt-get install -y python3 python3-pip
+RUN apt-get install -y --no-install-recommends gcc build-essential
+
 
 FROM builder as final
 ENV PYTHONBUFFERED 1
