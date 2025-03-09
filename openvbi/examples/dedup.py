@@ -14,7 +14,9 @@ def report_metadata(m: md.Metadata, tag: str) -> None:
 startTime = time.perf_counter()
 data = Dataset()
 depths = pandas.read_csv('/Users/brc/Projects-Extras/OpenVBI/ExampleData/wibl-raw.20.csv')
-data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths.lon, depths.lat), crs='EPSG:4326')
+# The file used for example here has "Epoch,Longitude,Latitude,Depth" as input columns, so we have to translate.
+depths = depths.rename(columns={'Epoch': 't', 'Longitude': 'lon', 'Latitude': 'lat', 'Depth': 'z'})
+data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
 endTime = time.perf_counter()
 print(f'LoadData:             {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
