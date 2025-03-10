@@ -1,0 +1,18 @@
+{
+	"name": "Python 3",
+	// Using the Dockerfile.build instead of a predefined image
+	"build": {
+		"dockerfile": "../Dockerfile.build",
+		"context": "..",
+		"target": "final"
+	},
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance"
+			]
+		}
+	}
+}
