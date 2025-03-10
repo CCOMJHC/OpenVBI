@@ -4,7 +4,7 @@ RUN apt-get install -y --no-install-recommends gcc build-essential
 
 
 FROM builder as final
-ENV PYTHONBUFFERED 1
+ENV PYTHONBUFFERED=1
 RUN mkdir /tmp/code
 ADD ./ /tmp/code
 WORKDIR /tmp/code
