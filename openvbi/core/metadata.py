@@ -278,6 +278,6 @@ class Metadata:
         self.meta['platform'] = metadata['platform']
         if 'processing' in metadata:
             self.meta['processing'] = metadata['processing']
-        result, errors = validate()
+        result, _ = self.validate()
         if not result:
             raise ValueError()
