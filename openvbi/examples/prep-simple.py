@@ -1,8 +1,7 @@
-import copy
 from openvbi.adaptors.ydvr import load_data
 from openvbi.filters.thresholding import shoaler_than, deeper_than
 from openvbi.filters.timeslot import before_time, after_time
-from openvbi.corrections.waterlevel.noaa import SingleStation, ZoneTides
+from openvbi.corrections.waterlevel.noaa import ZoneTides
 from openvbi.adaptors.dcdb import write_geojson
 
 # Pull in data from YachtDevices raw binary file, and convert to depths assuming NMEA2000 data
@@ -30,9 +29,9 @@ late = after_time(max_time)
 data = early.Execute(late.Execute(deep.Execute(shoal.Execute(data))))
 
 # Correct for waterlevel using NOAA zoned tides and live API for waterlevels
-zone_tide_wl = ZoneTides('tide_zone_polygons_new_WGS84_merge.shp')
+zone_tide_wl = ZoneTides('NOAA_tide_zones/tide_zone_polygons_new_WGS84_merge.shp')
 zone_tide_wl.preload(data)
-zone_tide_wl.correct(data)
+data = zone_tide_wl.correct(data)
 
 # Generate B.12-format GeoJSON output
 write_geojson(data, '00030095.json', indent=2)

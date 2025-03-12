@@ -98,7 +98,7 @@ class ProcessingType(StrEnum):
 
 class Metadata:
     def __init__(self) -> None:
-        self.meta = mandatoryMetadata
+        self.meta = mandatoryMetadata.copy()
 
     def setProviderID(self, providerName: str, providerEmail: str) -> None:
         self.meta['properties']['trustedNode']['providerOrganizationName'] = providerName
