@@ -269,15 +269,13 @@ class Metadata:
             return valid, result['errors']
 
     def adopt(self, metadata: Dict[str,Any]) -> None:
-        if 'type' not in metadata or 'crs' not in metadata or 'properties' not in metadata or 'platform' not in metadata:
+        if 'type' not in metadata or 'crs' not in metadata or 'properties' not in metadata:
             raise ValueError()
         self.meta = dict()
         self.meta['type'] = metadata['type']
         self.meta['crs'] = metadata['crs']
         self.meta['properties'] = metadata['properties']
-        self.meta['platform'] = metadata['platform']
-        if 'processing' in metadata:
-            self.meta['processing'] = metadata['processing']
-        result, _ = self.validate()
+        result, error = self.validate()
         if not result:
+            print(error)
             raise ValueError()

@@ -83,4 +83,3 @@ class RawObs(ABC):
 
 class NoDepths(RuntimeError):
     pass
-

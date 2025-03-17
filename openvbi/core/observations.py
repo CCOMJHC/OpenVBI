@@ -38,6 +38,7 @@ from openvbi.core.interpolation import InterpTable
 from openvbi.core.timebase import determine_time_source, generate_timebase
 import openvbi.core.metadata as md
 from openvbi import version
+from openvbi.adaptors.logger_file import DataPacket
 
 class BadData(Exception):
     pass
@@ -166,6 +167,46 @@ class RawN2000Obs(RawObs):
         lon = self._data['Fields']['longitude']
         lat = self._data['Fields']['latitude']
         return (lon, lat)
+
+class ParsedN2000(RawObs):
+    def __init__(self, elapsed: int, data: DataPacket) -> None:
+        if data.name() == 'SystemTime' or data.name() == 'GNSS':
+            has_time = True
+        else:
+            has_time = False
+        super().__init__(elapsed, data.name(), has_time)
+        self._data = data
+        
+    def MatchesTimeSource(self, source: TimeSource) -> bool:
+        if not self.HasTime():
+            return False
+        if self.Name() == 'SystemTime' and source == TimeSource.Time_SysTime:
+            return True
+        if self.Name() == 'GNSS' and source == TimeSource.Time_GNSS:
+            return True
+        return False
+
+    def Timestamp(self) -> float:
+        if not self.HasTime():
+            return -1.0
+        seconds_per_day = 24.0 * 60.0 * 60.0
+        if self.Name() == 'SystemTime':
+            timestamp = self._data.date * seconds_per_day + self._data.timestamp
+        elif self.Name() == 'GNSS':
+            timestamp = self._data.msg_date * seconds_per_day + self._data.msg_timestamp
+        else:
+            return -1.0
+        return timestamp
+
+    def Depth(self) -> float:
+        if self.Name() != 'Depth':
+            raise BadData()
+        return self._data.depth
+
+    def Position(self) -> Tuple[float,float]:
+        if self.Name() != 'GNSS':
+            raise BadData()
+        return (self._data.longitude, self._data.latitude)
 
 def count_messages(messages: List[RawObs]) -> PktStats:
     """Determine the list of messages that are available in the input data source.
