@@ -114,6 +114,9 @@ class Metadata:
         self.meta['properties']['trustedNode']['verticalReferenceOfDepth'] = verticalRef
         self.meta['properties']['trustedNode']['vesselPositionReferencePoint'] = verticalRefPosition
     
+    def setVesselName(self, vesselName: str) -> None:
+        self.meta['properties']['platform']['name'] = vesselName
+
     def setVessel(self, vesselType: str, vesselName: str, vesselLength: float) -> None:
         self.meta['properties']['platform']['type'] = vesselType
         self.meta['properties']['platform']['name'] = vesselName

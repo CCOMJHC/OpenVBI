@@ -37,7 +37,7 @@ def load_data(filename: str) -> Dataset:
                     ship_name = pkt.ship_name
                 if pkt.name() == 'SerialiserVersion':
                     # This is mandatory
-                    firmware_version = f'{pkt.major}.{pkt.minor}, N0183 {pkt.nmea0183_version}, N2000 {pkt.nmea2000_version}, IMU {pkt.imu_version}'
+                    firmware_version = f'{pkt.major}.{pkt.minor}/{pkt.nmea0183_version}/{pkt.nmea2000_version}/{pkt.imu_version}'
                 if pkt.name() == 'JSONMetadata':
                     # This is optional
                     metadata = json.loads(pkt.metadata_element.decode('utf-8'))
@@ -54,7 +54,8 @@ def load_data(filename: str) -> Dataset:
             except LoggerFile.PacketTranscriptionError:
                 pass
     
-    data.meta.setIdentifiers(logger_UUID, ship_name, firmware_version)
+    data.meta.setIdentifiers(logger_UUID, 'WIBL', firmware_version)
+    data.meta.setVesselName(ship_name)
     # In a WIBL file, it's possible that you have a full JSON metadata record embedded in the file,
     # and therefore you don't want to just over-ride the metadata --- it could be set for you!  We
     # therefore check whether the "NOTSET" detault from metadata.py is still set in some useful
