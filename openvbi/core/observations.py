@@ -162,11 +162,14 @@ class RawN2000Obs(RawObs):
         return self._data['Fields']['depth']
 
     def Position(self) -> Tuple[float,float]:
-        if self.Name() != 'GNSS':
-            raise BadData()
-        lon = self._data['Fields']['longitude']
-        lat = self._data['Fields']['latitude']
-        return (lon, lat)
+        match self.Name():
+            case 'GNSS' | 'Position, Rapid Update':
+                lon = self._data['Fields']['longitude']
+                lat = self._data['Fields']['latitude']
+                return lon, lat
+            case _:
+                raise BadData()
+
 
 class ParsedN2000(RawObs):
     def __init__(self, elapsed: int, data: DataPacket) -> None:
@@ -283,9 +286,14 @@ class Dataset:
         position_table = InterpTable(['lon', 'lat'])
 
         for obs in self.packets:
-            if obs.Name() == depth and obs.Elapsed() is not None:
+            if obs.Elapsed() is None:
+                continue
+
+            if obs.Name() == depth:
                 depth_table.add_point(obs.Elapsed(), 'z', obs.Depth())
-            if obs.Name() in ['GGA','GNSS'] and obs.Elapsed() is not None:
+            elif obs.Name() in ['GGA','GNSS']:
+                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+            elif obs.Name() == 'Position, Rapid Update':
                 position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
         
         depth_timepoints = depth_table.ind()

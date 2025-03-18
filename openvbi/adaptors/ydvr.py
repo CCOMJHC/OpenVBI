@@ -22,14 +22,17 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-
+import lzma
 import struct
 from typing import Tuple
+
+from marulc.nmea2000 import get_description_for_pgn
+from marulc.exceptions import ParseError
+
 from openvbi.core.observations import RawN2000Obs, BadData, Dataset
 from openvbi.core.statistics import PktFaults
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from marulc.nmea2000 import get_description_for_pgn
-from marulc.exceptions import ParseError
+
 
 def TranslateCANId(id: int) -> Tuple[int, int, int, int]:
     pf = (id >> 16) & 0xFF
@@ -95,7 +98,20 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
     return elapsed, pgn, packet
 
 
-def load_data(filename: str) -> Dataset:
+def load_data(filename: str,
+              *,
+              compressed=False) -> Dataset:
+    """
+    Load YDVR data from ``filename``.
+    :param filename:
+    :param compressed: If true, attempt to open ``filename`` as a lzma-compressed file.
+    :return:
+    """
+    if compressed:
+        fopen = lzma.open
+    else:
+        fopen = open
+
     data: Dataset = Dataset()
 
     # The elapsed time is milliseconds since the start of logging, and can wrap round.
@@ -112,7 +128,7 @@ def load_data(filename: str) -> Dataset:
     # 16-bit range, so it cycles quite a bit.
     maxelapsed: int = 65535
 
-    with open(filename, 'rb') as f:
+    with fopen(filename, 'rb') as f:
         while f:
             pkt_name = 'Unknown'
             elapsed, pgn, packet = next_packet(f)
