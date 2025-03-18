@@ -47,14 +47,14 @@ def test_basic_processing(data_path, temp_path):
     gjson_path = temp_path / '00030095.json'
     write_geojson(data, gjson_path, indent=2)
     assert gjson_path.exists()
-    # Don't compare to exact file size as file sizes can vary across filesystems types
+    # Don't compare to exact file size as file sizes can vary across filesystem types
     assert gjson_path.stat().st_size >= 263000
 
     basepath = temp_path / '00030095_copy'
     write_csv_json(data, basepath, indent=2)
     assert basepath.with_suffix('.csv').exists()
-    # Don't compare to exact file size as file sizes can vary across filesystems types
+    # Don't compare to exact file size as file sizes can vary across filesystem types
     assert basepath.with_suffix('.csv').stat().st_size >= 46000
     assert basepath.with_suffix('.json').exists()
-    # Don't compare to exact file size as file sizes can vary across filesystems types
+    # Don't compare to exact file size as file sizes can vary across filesystem types
     assert basepath.with_suffix('.json').stat().st_size >= 1000
