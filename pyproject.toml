@@ -1,5 +1,39 @@
 [build-system]
- requires = [
-     "setuptools >= 48",
-     "wheel >= 0.29.0",
- ]
+requires = ["setuptools>=76.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+name = "openvbi"
+authors = [
+    { name="Brian Calder", email="brc@ccom.unh.edu" }
+]
+description = "Open Volunteer Bathymetric Information reference code implementation"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'numpy>=2.0.0',
+    'marulc~=0.2.0',
+    'csbschema~=1.1.2'
+]
+
+[project.optional-dependencies]
+test = [
+    "flake8",
+    "unittest-xml-reporting~=3.2.0",
+    "lxml~=5.3.1",
+    "pytest~=8.3.5",
+    "pytest-cov~=6.0.0",
+    "pytest-xdist~=3.6.1",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/CCOMJHC/OpenVBI"
+"Bug Tracker" = "https://github.com/CCOMJHC/OpenVBI/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "openvbi.__version__"}
