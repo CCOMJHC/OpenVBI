@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, cast
 from pathlib import Path
 from importlib import resources
 import json
@@ -10,8 +10,12 @@ class SchemaNode(ABC):
     """
     Parent class for all schema nodes
     """
-    def __init__(self, name: str, parent: Optional['SchemaNode']):
+    def __init__(self, name: str, path: str | None, parent: Optional['SchemaNode']):
         self.name: str = name
+        if path is None:
+            self.path = "#/"
+        else:
+            self.path = path
         self.parent: Optional['SchemaNode'] = parent
 
     def to_string(self, *, depth: int = 1) -> str:
@@ -39,23 +43,23 @@ class SchemaRef(SchemaNode):
     """
     Reference to another entity
     """
-    def __init__(self, name: str, parent: SchemaNode):
-        super().__init__(name, parent)
+    def __init__(self, name: str, path: str, parent: SchemaNode):
+        super().__init__(name, path, parent)
         self.referent: SchemaNode | None = None
 
     def to_string(self, *, depth: int = 1) -> str:
         indent_root: str = '\t\t\t\t' * (depth - 1)
         indent: str = '\t\t\t' * depth
         referent = self.referent.name if self.referent is not None else 'nil'
-        return f"{indent_root}SchemaRef(name: {self.name},\n{indent}parent.name: {self.parent.name},\n{indent}referent: {referent})"
+        return f"{indent_root}SchemaRef(name: {self.name},\n{indent}path: {self.path}\n{indent}parent.name: {self.parent.name},\n{indent}referent: {referent})"
 
 class SchemaObject(SchemaNode):
     """
     Class for representing schema interior nodes
     """
 
-    def __init__(self, name: str, parent: SchemaNode | None, d: dict):
-        super().__init__(name, parent)
+    def __init__(self, name: str, path: str | None, parent: Optional['SchemaObject'], d: dict):
+        super().__init__(name, path, parent)
 
         self.properties: dict[str, SchemaNode] = {}
         self.required: list[str] = []
@@ -73,7 +77,7 @@ class SchemaObject(SchemaNode):
         cont_sub = '\t\t' * (depth+2)
         parent = self.parent.name if self.parent is not None else 'nil'
         o = io.StringIO()
-        o.write(f"{indent_root}SchemaObject(name: {self.name}, parent: {parent},\n")
+        o.write(f"{indent_root}SchemaObject(name: {self.name}, path: {self.path}, parent: {parent},\n")
         o.write(f"{indent}properties:\n")
         for p in self.properties.values():
             if p is None:
@@ -84,17 +88,49 @@ class SchemaObject(SchemaNode):
         for r in self.required:
             o.write(f"{cont_sub}{r}\n")
         o.write(f"{indent}defs:\n")
-        for name, obj in self.defs.items():
+        for path, obj in self.defs.items():
             if obj is None:
                 # TODO: Remove after we have implemented all node types, after which no nodes will be None
                 continue
-            o.write(f"{cont}name: {name}\n{cont}obj:\n{obj.to_string(depth=depth+1)}\n")
+            o.write(f"{cont}path: {path}\n{cont}obj:\n{obj.to_string(depth=depth+1)}\n")
         o.write(f"\n{indent_root})")
         return o.getvalue()
 
-    def resolve(self, path: str) -> SchemaNode:
-        # TODO:
-        pass
+    def resolve_refs(self, *, defs: dict | None = None):
+        print(f"resolving refs for path: {self.path}")
+        if defs is None:
+            d: dict = self.defs
+        else:
+            d: dict = defs
+
+        assert d is not None
+
+        # First resolve refs in any defs this object may have
+        for node in self.defs.values():
+            if node is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            if isinstance(node, SchemaObject):
+                node.resolve_refs(defs=d)
+            if isinstance(node, SchemaRef):
+                if node.path not in d:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = d[node.path]
+
+        # Now resolve refs in this object's properties
+        for node in self.properties.values():
+            if node is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            if isinstance(node, SchemaObject):
+                node.resolve_refs(defs=d)
+            if isinstance(node, SchemaRef):
+                if node.path not in d:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = d[node.path]
+
 
     def _from_dict(self, d: dict):
         if 'required' in d:
@@ -105,7 +141,7 @@ class SchemaObject(SchemaNode):
                 if isinstance(v, dict):
                     if '$ref' in v:
                         # Property is a reference node
-                        parsed: SchemaRef = SchemaRef(k, self)
+                        parsed: SchemaRef = SchemaRef(k, v['$ref'], self)
                         self.properties[k] = parsed
                         # Look at first element of path to record the defs key to later support
                         # resolving references to referents
@@ -120,13 +156,15 @@ class SchemaObject(SchemaNode):
                         # If we have a parent, it may hold the definition for this object
                     else:
                         # Property is a non-reference node
-                        self.properties[k] = parse_schema(v, k, self)
+                        path: str = f"{self.path}{k}"
+                        self.properties[k] = parse_schema(v, path, k, self)
         # Attempt to process defs
         for ref in self.defs_keys:
             if ref in d:
                 for k, v in d[ref].items():
-                    parsed: SchemaNode = parse_schema(v, k, self)
-                    self.defs[k] = parsed
+                    path: str = f"{self.path}{ref}/{k}"
+                    parsed: SchemaNode = parse_schema(v, path, k, self)
+                    self.defs[path] = parsed
                     # if k in self.ref_lookup:
                     #     # Associate parsed referent schema with SchemaRef
                     #     self.ref_lookup[k].referent = parsed
@@ -140,8 +178,8 @@ class SchemaLeaf(SchemaNode, ABC):
     pass
 
 class SchemaLeafString(SchemaLeaf):
-    def __init__(self, name: str, parent: SchemaNode | None, d: dict):
-        super().__init__(name, parent)
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict):
+        super().__init__(name, path, parent)
 
         self.title: str | None
         self.description: str | None
@@ -151,13 +189,13 @@ class SchemaLeafString(SchemaLeaf):
         self._from_dict(d)
 
     def to_string(self, *, depth: int = 1) -> str:
-        indent_root: str = '\t\t\t\t' * (depth - 1)
-        indent: str = '\t\t\t' * depth
+        indent_root: str = '\t\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t\t' * depth
         title = self.title if self.title is not None else 'nil'
         desc = self.description if self.description is not None else 'nil'
         patt = self.pattern if self.pattern is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return f"{indent_root}SchemaLeafString(title: {title},\n{indent}description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent})"
+        return f"{indent_root}SchemaLeafString(path: {self.path},\n{indent}title: {title},\n{indent}description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent})"
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
@@ -166,9 +204,11 @@ class SchemaLeafString(SchemaLeaf):
 
 
 S = TypeVar('S', bound=SchemaNode)
-def parse_schema(schema: dict, name: str | None, parent: SchemaNode | None) -> S:
+def parse_schema(schema: dict, path: str | None, name: str | None, parent: SchemaNode | None) -> S:
     """
     Parse JSON Schema document. Note: Assumes the root of the schema is an object for our purposes for now.
+    :param name:
+    :param path:
     :param schema:
     :param parent:
     :return:
@@ -178,9 +218,9 @@ def parse_schema(schema: dict, name: str | None, parent: SchemaNode | None) -> S
 
     match schema['type']:
         case 'object':
-            return SchemaObject(name, parent, schema)
+            return SchemaObject(name, path, parent, schema)
         case 'string':
-            return SchemaLeafString(name, parent, schema)
+            return SchemaLeafString(name, path, parent, schema)
         case _:
             print(f"Have not yet implemented parsing of schema of type {schema['type']}")
 
@@ -196,6 +236,10 @@ def test_playground():
         schema: dict = json.load(f)
     assert schema is not None
 
-    schema_node: SchemaNode = parse_schema(schema, None, None)
+    schema_node: SchemaNode = parse_schema(schema, None,None, None)
     assert schema_node is not None
-    print(f"Parsed schema was:\n{schema_node.to_string()}")
+    assert isinstance(schema_node, SchemaObject)
+    schema_obj: SchemaObject = cast(SchemaObject, schema_node)
+    # print(f"Parsed schema before resolving refs was:\n{schema_obj.to_string()}")
+    schema_obj.resolve_refs()
+    print(f"Parsed schema AFTER resolving refs was:\n{schema_obj.to_string()}")
