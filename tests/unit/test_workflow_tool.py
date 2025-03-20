@@ -24,14 +24,6 @@ class SchemaNode(ABC):
     def resolve(self, path: str) -> 'SchemaNode':
         pass
 
-    # def join_path(self, child: str) -> str:
-    #     ref_root_idx: int = child.find('#/')
-    #     if ref_root_idx == 0:
-    #         # Child is a reference
-    #         return f"{self.path}{child[1:]}"
-    #     else:
-    #         return f"{self.path}/{child}"
-
     def get_path(self) -> str:
         if self.parent is None:
             return f"/{self.name}"
@@ -65,7 +57,6 @@ class SchemaObject(SchemaNode):
         self.required: list[str] = []
         self.defs_keys: set[str] = set()
         self.defs: dict[str, SchemaNode] = {}
-        # self.ref_lookup: dict[str, SchemaRef] = {}
 
         # Initialize object from dict
         self._from_dict(d)
@@ -151,9 +142,6 @@ class SchemaObject(SchemaNode):
                         ref_path_components = ref_path.split('/')
                         assert len(ref_path_components) >= 2
                         self.defs_keys.add(ref_path_components[1])
-                        # Map referent name to SchemaRef node to facilitate later lookups
-                        # self.ref_lookup[ref_path_components[2]] = parsed
-                        # If we have a parent, it may hold the definition for this object
                     else:
                         # Property is a non-reference node
                         path: str = f"{self.path}{k}"
@@ -165,11 +153,6 @@ class SchemaObject(SchemaNode):
                     path: str = f"{self.path}{ref}/{k}"
                     parsed: SchemaNode = parse_schema(v, path, k, self)
                     self.defs[path] = parsed
-                    # if k in self.ref_lookup:
-                    #     # Associate parsed referent schema with SchemaRef
-                    #     self.ref_lookup[k].referent = parsed
-
-
 
 class SchemaLeaf(SchemaNode, ABC):
     """
