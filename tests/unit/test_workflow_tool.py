@@ -3,6 +3,7 @@ from typing import Optional, TypeVar
 from pathlib import Path
 from importlib import resources
 import json
+import io
 
 
 class SchemaNode(ABC):
@@ -13,8 +14,8 @@ class SchemaNode(ABC):
         self.name: str = name
         self.parent: Optional['SchemaNode'] = parent
 
-    def __str__(self) -> str:
-        return f"name: self.name, parent: {str(self.parent)} }}"
+    def to_string(self, *, depth: int = 1) -> str:
+        pass
 
     def resolve(self, path: str) -> 'SchemaNode':
         pass
@@ -38,13 +39,15 @@ class SchemaRef(SchemaNode):
     """
     Reference to another entity
     """
-    def __self__(self, name: str, parent: SchemaNode):
+    def __init__(self, name: str, parent: SchemaNode):
         super().__init__(name, parent)
         self.referent: SchemaNode | None = None
 
-    def __str__(self) -> str:
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t' * depth
         referent = self.referent.name if self.referent is not None else 'nil'
-        return f"SchemaRef(name: {self.name}, parent.name: {self.parent.name}, referent: {referent})"
+        return f"{indent_root}SchemaRef(name: {self.name},\n{indent}parent.name: {self.parent.name},\n{indent}referent: {referent})"
 
 class SchemaObject(SchemaNode):
     """
@@ -63,11 +66,40 @@ class SchemaObject(SchemaNode):
         # Initialize object from dict
         self._from_dict(d)
 
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t' * (depth-1)
+        indent: str = '\t\t\t' * depth
+        cont: str = '\t\t\t' * (depth+1)
+        cont_sub = '\t\t' * (depth+2)
+        parent = self.parent.name if self.parent is not None else 'nil'
+        o = io.StringIO()
+        o.write(f"{indent_root}SchemaObject(name: {self.name}, parent: {parent},\n")
+        o.write(f"{indent}properties:\n")
+        for p in self.properties.values():
+            if p is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{p.to_string(depth=depth+1)}\n")
+        o.write(f"{indent}required:\n")
+        for r in self.required:
+            o.write(f"{cont_sub}{r}\n")
+        o.write(f"{indent}defs:\n")
+        for name, obj in self.defs.items():
+            if obj is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{cont}name: {name}\n{cont}obj:\n{obj.to_string(depth=depth+1)}\n")
+        o.write(f"\n{indent_root})")
+        return o.getvalue()
+
     def resolve(self, path: str) -> SchemaNode:
         # TODO:
         pass
 
     def _from_dict(self, d: dict):
+        if 'required' in d:
+            for r in d['required']:
+                self.required.append(r)
         if 'properties' in d:
             for k, v in d['properties'].items():
                 if isinstance(v, dict):
@@ -118,12 +150,14 @@ class SchemaLeafString(SchemaLeaf):
         # Initialize object from dict
         self._from_dict(d)
 
-    def __str__(self) -> str:
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t' * depth
         title = self.title if self.title is not None else 'nil'
         desc = self.description if self.description is not None else 'nil'
         patt = self.pattern if self.pattern is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return f"SchemaLeafString(title: {title}, description: {desc}, pattern: {patt}, parent: {parent})"
+        return f"{indent_root}SchemaLeafString(title: {title},\n{indent}description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent})"
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
@@ -151,7 +185,6 @@ def parse_schema(schema: dict, name: str | None, parent: SchemaNode | None) -> S
             print(f"Have not yet implemented parsing of schema of type {schema['type']}")
 
 
-
 def test_playground():
     schema_file_name = 'XYZ-CSB-schema-3_1_0-2024-04.json'
     # TODO: Eventually add an API to csbschema to get the schema files in a safer way, for now this will do...
@@ -165,3 +198,4 @@ def test_playground():
 
     schema_node: SchemaNode = parse_schema(schema, None, None)
     assert schema_node is not None
+    print(f"Parsed schema was:\n{schema_node.to_string()}")
