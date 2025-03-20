@@ -40,7 +40,8 @@ import datetime as dt
 import tempfile
 import os
 import json
-from csbschema.validators import validate_b12_3_1_0_2023_08
+
+from csbschema.validators import validate_b12_3_1_0_2024_04
 
 mandatoryMetadata = {
     'type': 'FeatureCollection',
@@ -263,8 +264,7 @@ class Metadata:
         os.close(fd)
         filepath = Path(filename)
         self.render(filepath)
-        # (valid, result) = validate_b12_3_1_0_2024_04(filepath)
-        (valid, result) = validate_b12_3_1_0_2023_08(filepath)
+        (valid, result) = validate_b12_3_1_0_2024_04(filepath)
         filepath.unlink()
         if valid:
             return valid, None

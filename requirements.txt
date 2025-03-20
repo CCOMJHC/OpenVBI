@@ -1,6 +1,6 @@
-setuptools
-numpy>=1.26
-csbschema~=1.1.1
-marulc>=0.2.0
-geopandas>=0.14.3
-requests>=2.31.0
+setuptools>=76.1.0
+numpy>=2.0.0
+csbschema~=1.1.2
+marulc~=0.2.0
+geopandas~=1.0.1
+requests>=2.32.3

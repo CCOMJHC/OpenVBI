@@ -3,12 +3,12 @@ RUN apt-get update -y
 RUN apt-get install -y --no-install-recommends gcc build-essential
 
 
-FROM builder as final
+FROM builder AS final
 ENV PYTHONBUFFERED=1
 RUN mkdir /tmp/code
 ADD ./ /tmp/code
 WORKDIR /tmp/code
 
 RUN python3 -m pip install -U pip \
-    && python3 -m pip install -r requirements-build.txt \
+    && python3 -m pip install -r requirements-test.txt \
     && python3 -m pip install .

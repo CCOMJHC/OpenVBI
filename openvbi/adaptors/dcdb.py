@@ -22,7 +22,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-
+from pathlib import Path
 from typing import Dict,Tuple,Any
 import geopandas
 import pandas
@@ -54,7 +54,7 @@ def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
 
     return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
 
-def write_geojson(dataset: Dataset, filename: str, **kwargs) -> None:
+def write_geojson(dataset: Dataset, filename: str | Path, **kwargs) -> None:
     FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
     feature_lst = []
     for n in range(len(dataset.depths)):
@@ -80,11 +80,19 @@ def write_geojson(dataset: Dataset, filename: str, **kwargs) -> None:
     with open(filename, 'w') as f:
         json.dump(data, f, **kwargs)
 
-def write_csv_json(dataset: Dataset, basename: str, **kwargs) -> None:
+def write_csv_json(dataset: Dataset, basename: str | Path, **kwargs) -> None:
+    match basename:
+        case str():
+            basepath: Path = Path(basename)
+        case Path():
+            basepath: Path = basename
+        case _:
+            raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
+
     working_depths = dataset.depths.copy()
     working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
-    working_depths.to_csv(basename + '.csv', columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
+    working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
     meta = dataset.meta.metadata()
     meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
-    with open(basename + '.json', 'w') as f:
+    with open(basepath.with_suffix('.json'), 'w') as f:
         json.dump(meta['properties'], f, **kwargs)
