@@ -24,6 +24,9 @@
 
 from abc import ABC
 from typing import Optional, TypeVar
+from pathlib import Path
+from importlib import resources
+import json
 import io
 
 
@@ -227,3 +230,16 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
             return SchemaLeafString(name, path, parent, schema)
         case _:
             print(f"Have not yet implemented parsing of schema of type {schema['type']}")
+
+def open_schema(*, schema_filename: str = 'XYZ-CSB-schema-3_1_0-2024-04.json') -> dict:
+    # TODO: Eventually add an API to csbschema to get the schema files in a safer way, for now this will do...
+    schema_path: Path = Path(str(resources.files('csbschema').joinpath(f"data/{schema_filename}")))
+    assert schema_path.exists()
+    assert schema_path.is_file()
+
+    with schema_path.open(mode='r') as f:
+        schema: dict = json.load(f)
+    assert schema is not None
+
+    return schema
+

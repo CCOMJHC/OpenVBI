@@ -1,22 +1,11 @@
 from typing import cast
-from pathlib import Path
-from importlib import resources
-import json
 
-from openvbi.core.schema import parse_schema, SchemaNode, SchemaObject
+from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject
 
 
 def test_playground():
-    schema_file_name = 'XYZ-CSB-schema-3_1_0-2024-04.json'
-    # TODO: Eventually add an API to csbschema to get the schema files in a safer way, for now this will do...
-    schema_path: Path = Path(str(resources.files('csbschema').joinpath(f"data/{schema_file_name}")))
-    assert schema_path.exists()
-    assert schema_path.is_file()
-
-    with schema_path.open(mode='r') as f:
-        schema: dict = json.load(f)
+    schema: dict = open_schema()
     assert schema is not None
-
     schema_node: SchemaNode = parse_schema(schema, None,None, None)
     assert schema_node is not None
     assert isinstance(schema_node, SchemaObject)
