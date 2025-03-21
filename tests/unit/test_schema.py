@@ -3,7 +3,7 @@ from typing import cast
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject
 
 
-def test_playground():
+def test_schema_parsing():
     schema: dict = open_schema()
     assert schema is not None
     schema_node: SchemaNode = parse_schema(schema, None,None, None)
