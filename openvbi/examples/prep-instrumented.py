@@ -2,7 +2,7 @@ import time
 import pandas
 import json
 import copy
-from openvbi.adaptors.ydvr import load_data
+from openvbi.adaptors.ydvr import YDVRLoader
 from openvbi.filters.thresholding import shoaler_than, deeper_than
 from openvbi.filters.timeslot import before_time, after_time
 from openvbi.corrections.waterlevel.noaa import SingleStation, ZoneTides
@@ -13,8 +13,9 @@ def report_metadata(m: md.Metadata, tag: str) -> None:
     print(f'{tag}:')
     print(d)
 
+loader = YDVRLoader()
 startTime = time.perf_counter()
-data = load_data('/Users/brc/Projects-Extras/OpenVBI/ExampleData/00030095.DAT')
+data = loader.load('/data/00030095.DAT')
 endTime = time.perf_counter()
 print(f'LoadData:             {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
@@ -55,7 +56,7 @@ endTime = time.perf_counter()
 print(f'PreloadSingleStation: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
 startTime = time.perf_counter()
-zone_tide_wl = ZoneTides('/Users/brc/Projects-Extras/OpenVBI/ExampleData/NOAA_tide_zones/tide_zone_polygons_new_WGS84_merge.shp')
+zone_tide_wl = ZoneTides('/data/NOAA_tide_zones/tide_zone_polygons_new_WGS84_merge.shp')
 zone_tide_wl.preload(data)
 endTime = time.perf_counter()
 print(f'PreloadZoneStation:   {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')

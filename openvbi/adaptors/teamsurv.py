@@ -25,54 +25,59 @@
 
 from openvbi.core.observations import RawN0183Obs, BadData, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
+from openvbi.adaptors import Loader
 
-def load_data(filename: str) -> Dataset:
-    rtn: Dataset = Dataset()
-
-    with open(filename) as f:
-        for message in f:
-            try:
-                obs = RawN0183Obs(None, message)
-                rtn.packets.append(obs)
-                rtn.stats.Observed(obs.Name())
-            except BadData:
-                pass
-    rtn.timesrc = determine_time_source(rtn.stats)
-
-    # TeamSurv systems don't have elapsed time (and intermingle two streams of
-    # data from the two interfaces without warning), so you can't tell when the packets
-    # were received.  We therefore attempt to fake this as best we can be establishing the
-    # timestamps on each packet that has one, and then assuming that other packets appear
-    # at the midpoint between those timestamps.  This works reasonably so long as there is
-    # a regular time tick like a SystemTime or ZDA, but will otherwise fail.
-    realtime_elapsed_zero = None
-    for n in range(len(rtn.packets)):
-        if rtn.packets[n].HasTime() and rtn.packets[n].MatchesTimeSource(rtn.timesrc):
-            packet_real_time = rtn.packets[n].Timestamp()
-            if realtime_elapsed_zero is None:
-                realtime_elapsed_zero = packet_real_time
-                rtn.packets[n].SetElapsed(0.0)
-            else:
-                rtn.packets[n].SetElapsed(1000.0*(packet_real_time - realtime_elapsed_zero))
+class TeamSurvLoader(Loader):
+    def suffix(self) -> str:
+        return '.TSV'
     
-    # Now we need to patch up all the packets with elapsed time still set to None
-    oldest_position = None
-    for n in range(len(rtn.packets)):
-        if rtn.packets[n].Elapsed() is not None:
-            if oldest_position is None:
-                # First time we've seen something that has a timestamp
-                oldest_position = n
-            else:
-                # Subsequent timestamped data, so (oldest_position, n) need set to the mean
-                # time of the two timestamped packets (which is the best we can do, since we
-                # don't have any record of when they actually arrived)
-                target_elapsed_time = (rtn.packets[oldest_position].Elapsed() + rtn.packets[n].Elapsed())/2.0
-                for i in range(oldest_position+1,n):
-                    rtn.packets[i].SetElapsed(target_elapsed_time)
-                # Update position of the previous timestamp to now
-                oldest_position = n
+    def load(self, filename: str) -> Dataset:
+        rtn: Dataset = Dataset()
 
-    rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
-    rtn.meta.setIdentifiers('NOTSET', 'TeamSurv SmartLogger', '1.0')
+        with open(filename) as f:
+            for message in f:
+                try:
+                    obs = RawN0183Obs(None, message)
+                    rtn.packets.append(obs)
+                    rtn.stats.Observed(obs.Name())
+                except BadData:
+                    pass
+        rtn.timesrc = determine_time_source(rtn.stats)
 
-    return rtn
+        # TeamSurv systems don't have elapsed time (and intermingle two streams of
+        # data from the two interfaces without warning), so you can't tell when the packets
+        # were received.  We therefore attempt to fake this as best we can be establishing the
+        # timestamps on each packet that has one, and then assuming that other packets appear
+        # at the midpoint between those timestamps.  This works reasonably so long as there is
+        # a regular time tick like a SystemTime or ZDA, but will otherwise fail.
+        realtime_elapsed_zero = None
+        for n in range(len(rtn.packets)):
+            if rtn.packets[n].HasTime() and rtn.packets[n].MatchesTimeSource(rtn.timesrc):
+                packet_real_time = rtn.packets[n].Timestamp()
+                if realtime_elapsed_zero is None:
+                    realtime_elapsed_zero = packet_real_time
+                    rtn.packets[n].SetElapsed(0.0)
+                else:
+                    rtn.packets[n].SetElapsed(1000.0*(packet_real_time - realtime_elapsed_zero))
+        
+        # Now we need to patch up all the packets with elapsed time still set to None
+        oldest_position = None
+        for n in range(len(rtn.packets)):
+            if rtn.packets[n].Elapsed() is not None:
+                if oldest_position is None:
+                    # First time we've seen something that has a timestamp
+                    oldest_position = n
+                else:
+                    # Subsequent timestamped data, so (oldest_position, n) need set to the mean
+                    # time of the two timestamped packets (which is the best we can do, since we
+                    # don't have any record of when they actually arrived)
+                    target_elapsed_time = (rtn.packets[oldest_position].Elapsed() + rtn.packets[n].Elapsed())/2.0
+                    for i in range(oldest_position+1,n):
+                        rtn.packets[i].SetElapsed(target_elapsed_time)
+                    # Update position of the previous timestamp to now
+                    oldest_position = n
+
+        rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
+        rtn.meta.setIdentifiers('NOTSET', 'TeamSurv SmartLogger', '1.0')
+
+        return rtn

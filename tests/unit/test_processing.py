@@ -1,9 +1,9 @@
 from pathlib import Path
 import uuid
 
-from openvbi.adaptors.ydvr import load_data
+from openvbi.adaptors.ydvr import YDVRLoader
 import openvbi.core.metadata as md
-from openvbi.adaptors.dcdb import write_geojson, write_csv_json
+from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
 from tests.fixtures import data_path, temp_path
 
@@ -13,7 +13,8 @@ def test_basic_processing(data_path, temp_path):
 
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
-        data = load_data(ydvr_file, compressed=ydvr_file.suffix == '.lzma')
+        loader = YDVRLoader(compressed=ydvr_file.suffix == '.lzma')
+        data = loader.load(ydvr_file)
     except Exception as e:
         exception_thrown = True
     assert not exception_thrown
@@ -45,13 +46,15 @@ def test_basic_processing(data_path, temp_path):
     data.generate_observations('Depth')
 
     gjson_path = temp_path / '00030095.json'
-    write_geojson(data, gjson_path, indent=2)
+    writer = GeoJSONWriter()
+    writer.write(data, gjson_path, indent=2)
     assert gjson_path.exists()
     # Don't compare to exact file size as file sizes can vary across filesystem types
     assert gjson_path.stat().st_size >= 263000
 
     basepath = temp_path / '00030095_copy'
-    write_csv_json(data, basepath, indent=2)
+    writer = CSVWriter()
+    writer.write(data, basepath, indent=2)
     assert basepath.with_suffix('.csv').exists()
     # Don't compare to exact file size as file sizes can vary across filesystem types
     assert basepath.with_suffix('.csv').stat().st_size >= 46000

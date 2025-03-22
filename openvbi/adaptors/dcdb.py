@@ -31,68 +31,81 @@ import json
 from datetime import datetime, timezone
 import openvbi.core.metadata as md
 from openvbi.core.observations import Dataset
+from openvbi.adaptors import Loader, Writer
 
-def load_csv_data(filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
-    data = geopandas.read_file(filename)
-    data = data.rename(columns={'DEPTH': 'z', 'LON': 'lon', 'LAT': 'lat'})
-    data['t'] = np.fromiter((t.timestamp() for t in pandas.to_datetime(data['TIME'])), dtype='float')
+class CSVLoader(Loader):
+    def suffix(self) -> str:
+        return '.csv'
     
-    logger_uuid = data['UNIQUE_ID'].unique()[0]
-    file_uuid = data['FILE_UUID'].unique()[0]
-    ship_name = data['PLATFORM_NAME'].unique()[0]
-    provider = data['PROVIDER'].unique()[0]
+    def load(self, filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
+        data = geopandas.read_file(filename)
+        data = data.rename(columns={'DEPTH': 'z', 'LON': 'lon', 'LAT': 'lat'})
+        data['t'] = np.fromiter((t.timestamp() for t in pandas.to_datetime(data['TIME'])), dtype='float')
+        
+        logger_uuid = data['UNIQUE_ID'].unique()[0]
+        file_uuid = data['FILE_UUID'].unique()[0]
+        ship_name = data['PLATFORM_NAME'].unique()[0]
+        provider = data['PROVIDER'].unique()[0]
+        
+        data = data.drop(columns=['TIME', 'UNIQUE_ID','FILE_UUID', 'PROVIDER', 'PLATFORM_NAME'])
+        data = data.astype({'z':'float'})
+        data = data.dropna(subset=['t'])
+
+        meta = md.Metadata()
+        meta.setProviderID(provider, 'UNKNOWN')
+        meta.setIdentifiers(logger_uuid, 'UNKNOWN', 'UNKNOWN')
+        meta.setReferencing(md.VerticalReference.UNKNOWN, md.VerticalReferencePosition.GNSS)
+        meta.setVessel('UNKNOWN', ship_name, -1.0)
+
+        return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
+
+class GeoJSONWriter(Writer):
+    def suffix(self) -> str:
+        return '.json'
     
-    data = data.drop(columns=['TIME', 'UNIQUE_ID','FILE_UUID', 'PROVIDER', 'PLATFORM_NAME'])
-    data = data.astype({'z':'float'})
-    data = data.dropna(subset=['t'])
-
-    meta = md.Metadata()
-    meta.setProviderID(provider, 'UNKNOWN')
-    meta.setIdentifiers(logger_uuid, 'UNKNOWN', 'UNKNOWN')
-    meta.setReferencing(md.VerticalReference.UNKNOWN, md.VerticalReferencePosition.GNSS)
-    meta.setVessel('UNKNOWN', ship_name, -1.0)
-
-    return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
-
-def write_geojson(dataset: Dataset, filename: str | Path, **kwargs) -> None:
-    FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
-    feature_lst = []
-    for n in range(len(dataset.depths)):
-        timestamp = datetime.fromtimestamp(dataset.depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
-        feature = {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [
-                    dataset.depths['lon'].iloc[n],
-                    dataset.depths['lat'].iloc[n]
-                ]
-            },
-            "properties": {
-                "depth": dataset.depths['z'].iloc[n],
-                "uncertainty": dataset.depths['u'].iloc[n],
-                "time": timestamp
+    def write(self, dataset: Dataset, filename: str | Path, **kwargs) -> None:
+        FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
+        feature_lst = []
+        for n in range(len(dataset.depths)):
+            timestamp = datetime.fromtimestamp(dataset.depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        dataset.depths['lon'].iloc[n],
+                        dataset.depths['lat'].iloc[n]
+                    ]
+                },
+                "properties": {
+                    "depth": dataset.depths['z'].iloc[n],
+                    "uncertainty": dataset.depths['u'].iloc[n],
+                    "time": timestamp
+                }
             }
-        }
-        feature_lst.append(dict(feature))
-    data = dataset.meta.metadata()
-    data['features'] = feature_lst
-    with open(filename, 'w') as f:
-        json.dump(data, f, **kwargs)
+            feature_lst.append(dict(feature))
+        data = dataset.meta.metadata()
+        data['features'] = feature_lst
+        with open(filename, 'w') as f:
+            json.dump(data, f, **kwargs)
 
-def write_csv_json(dataset: Dataset, basename: str | Path, **kwargs) -> None:
-    match basename:
-        case str():
-            basepath: Path = Path(basename)
-        case Path():
-            basepath: Path = basename
-        case _:
-            raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
+class CSVWriter(Writer):
+    def suffix(self) -> str:
+        return '.csv'
+    
+    def write(self, dataset: Dataset, basename: str | Path, **kwargs) -> None:
+        match basename:
+            case str():
+                basepath: Path = Path(basename)
+            case Path():
+                basepath: Path = basename
+            case _:
+                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
 
-    working_depths = dataset.depths.copy()
-    working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
-    working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
-    meta = dataset.meta.metadata()
-    meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
-    with open(basepath.with_suffix('.json'), 'w') as f:
-        json.dump(meta['properties'], f, **kwargs)
+        working_depths = dataset.depths.copy()
+        working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
+        working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
+        meta = dataset.meta.metadata()
+        meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
+        with open(basepath.with_suffix('.json'), 'w') as f:
+            json.dump(meta['properties'], f, **kwargs)
