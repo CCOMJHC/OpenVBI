@@ -1,8 +1,6 @@
--r requirements.txt
 flake8
 unittest-xml-reporting~=3.2.0
 lxml~=5.3.1
 pytest~=8.3.5
 pytest-cov~=6.0.0
 pytest-xdist~=3.6.1
-deepmerge>=2.0
