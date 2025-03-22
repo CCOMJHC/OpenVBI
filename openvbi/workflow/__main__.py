@@ -3,6 +3,8 @@ from typing import cast
 import sys
 import tkinter as tk
 from tkinter import filedialog
+from pathlib import Path
+import json
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
     SchemaLeafString
@@ -94,6 +96,16 @@ class SchemaRefWidgetsRenderer(SchemaNodeWidgetsRenderer):
         return valid
 
 
+def generate_output(d: dict) -> dict:
+    ser = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            ser[k] = generate_output(v)
+        elif isinstance(v, tk.StringVar):
+            ser[k] = v.get()
+    return ser
+
+
 class MainWindow:
     hor_pad = 10
     ver_pad = 5
@@ -129,6 +141,19 @@ class MainWindow:
         else:
             self.set_export_filename_invalid(False)
 
+    def serialize(self, out_file: Path) -> bool:
+        with open(out_file, mode='w') as f:
+            json.dump(generate_output(self.state), f)
+        return True
+
+    def do_export(self):
+        is_valid: bool = self.validate()
+        if not is_valid:
+            print("Normally we'd stop exporting because validation failed...")
+        # Export
+        self.serialize(Path(self.export_filename.get()))
+
+
 
     def __init__(self, root: tk.Tk, schema: SchemaObject) -> None:
         self.properties: dict[str, SchemaNodeWidgetsRenderer] = {}
@@ -157,10 +182,16 @@ class MainWindow:
 
         # Set up buttons for direct actions
         self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
+
         self.validate_button = tk.Button(self.button_frame, text="Validate", command=self.validate)
         self.validate_button.grid(row=0, column=0)
+
+        self.export_button = tk.Button(self.button_frame, text="Export", command=self.do_export)
+        self.export_button.grid(row=0, column=1)
+
         self.exit_button = tk.Button(self.button_frame, text="Quit", command=root.destroy)
-        self.exit_button.grid(row=0, column=1)
+        self.exit_button.grid(row=0, column=2)
+
         self.button_frame.pack(fill='x')
 
 
