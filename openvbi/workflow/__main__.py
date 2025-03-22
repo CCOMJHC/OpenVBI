@@ -1,3 +1,18 @@
+"""
+TODO:
+    - Add validation for patterns
+    - Add support for non-string fields (integer, enum, array)
+    - Add * to label for required fields
+    - Right justify labels
+    - Use localization to provide friendly names for fields
+    - Add tooltips with descriptions for fields
+    - For fields that are controlled vocabularies, provide drop-downs instead of free text
+    - Display version of schema used (when this tool is launched eventually by workflow tool, allow schema version
+      to be chosen from drop-down
+    - ...
+
+"""
+
 from abc import ABC
 from typing import cast
 import sys
