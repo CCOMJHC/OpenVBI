@@ -54,7 +54,6 @@ class SchemaNode(ABC):
         else:
             return f"{self.parent.get_path()}/{self.name}"
 
-
 class SchemaRef(SchemaNode):
     """
     Reference to another entity
@@ -78,7 +77,7 @@ class SchemaObject(SchemaNode):
         super().__init__(name, path, parent)
 
         self.properties: dict[str, SchemaNode] = {}
-        self.required: list[str] = []
+        self.required: set[str] = set()
         self.defs_keys: set[str] = set()
         self.defs: dict[str, SchemaNode] = {}
 
@@ -146,11 +145,10 @@ class SchemaObject(SchemaNode):
                 else:
                     node.referent = d[node.path]
 
-
     def _from_dict(self, d: dict):
         if 'required' in d:
             for r in d['required']:
-                self.required.append(r)
+                self.required.add(r)
         if 'properties' in d:
             for k, v in d['properties'].items():
                 if isinstance(v, dict):
@@ -168,8 +166,11 @@ class SchemaObject(SchemaNode):
                         self.defs_keys.add(ref_path_components[1])
                     else:
                         # Property is a non-reference node
-                        path: str = f"{self.path}{k}"
-                        self.properties[k] = parse_schema(v, path, k, self)
+                        if self.path.endswith('/'):
+                            path: str = f"{self.path}{k}"
+                        else:
+                            path: str = f"{self.path}/{k}"
+                        self.properties[k] = parse_schema(v, path, k, self, required=k in self.required)
         # Attempt to process defs
         for ref in self.defs_keys:
             if ref in d:
@@ -182,11 +183,17 @@ class SchemaLeaf(SchemaNode, ABC):
     """
     Super-class for schema terminal nodes
     """
-    pass
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent)
+        self.required = required
 
 class SchemaLeafString(SchemaLeaf):
-    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict):
-        super().__init__(name, path, parent)
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent, required=required)
 
         self.title: str | None
         self.description: str | None
@@ -202,7 +209,9 @@ class SchemaLeafString(SchemaLeaf):
         desc = self.description if self.description is not None else 'nil'
         patt = self.pattern if self.pattern is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return f"{indent_root}SchemaLeafString(path: {self.path},\n{indent}title: {title},\n{indent}description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent})"
+        return (f"{indent_root}SchemaLeafString(path: {self.path},\n{indent}title: {title},\n{indent}"
+                f"description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent},\n{indent}"
+                f"required: {self.required})")
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
@@ -210,14 +219,17 @@ class SchemaLeafString(SchemaLeaf):
         self.pattern = d.get('pattern')
 
 
-S = TypeVar('S', bound=SchemaNode)
-def parse_schema(schema: dict, path: str | None, name: str | None, parent: SchemaNode | None) -> S:
+S = TypeVar('S', bound=SchemaNode | None)
+def parse_schema(schema: dict, path: str | None, name: str | None, parent: SchemaNode | None,
+                 *,
+                 required: bool | None = None) -> S:
     """
     Parse JSON Schema document. Note: Assumes the root of the schema is an object for our purposes for now.
     :param name:
     :param path:
     :param schema:
     :param parent:
+    :param required: Should only be set for SchemaLeafString, will be ignored for other types
     :return:
     """
     if 'type' not in schema:
@@ -227,7 +239,11 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
         case 'object':
             return SchemaObject(name, path, parent, schema)
         case 'string':
-            return SchemaLeafString(name, path, parent, schema)
+            if required is None:
+                is_required = False
+            else:
+                is_required = required
+            return SchemaLeafString(name, path, parent, schema, required=is_required)
         case _:
             print(f"Have not yet implemented parsing of schema of type {schema['type']}")
 
