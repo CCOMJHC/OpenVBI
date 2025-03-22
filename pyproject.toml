@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 dynamic = ["version"]
 name = "openvbi"
 authors = [
-    { name="Brian Calder", email="brc@ccom.unh.edu" }
+    { name="Brian Calder", email="brc@ccom.unh.edu" },
+    { name="Brian Miles", email="bmiles@ccom.unh.edu" }
 ]
 description = "Open Volunteer Bathymetric Information reference code implementation"
 readme = "README.md"
@@ -21,6 +22,7 @@ dependencies = [
     "marulc~=0.2.0",
     "geopandas~=1.0.1",
     "requests>=2.32.3",
+    "deepmerge>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +33,7 @@ test = [
     "pytest~=8.3.5",
     "pytest-cov~=6.0.0",
     "pytest-xdist~=3.6.1",
+    "deepmerge>=2.0",
 ]
 
 [project.urls]
