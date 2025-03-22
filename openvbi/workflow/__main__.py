@@ -2,6 +2,7 @@ from abc import ABC
 from typing import cast
 import sys
 import tkinter as tk
+from tkinter import filedialog
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
     SchemaLeafString
@@ -97,13 +98,37 @@ class MainWindow:
     hor_pad = 10
     ver_pad = 5
 
+    def set_export_filename_invalid(self, is_invalid: bool):
+        if is_invalid:
+            self.filename_entry.configure(highlightbackground="red", highlightcolor="red", highlightthickness=1)
+            self.is_invalid = True
+        else:
+            self.filename_entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
+            self.is_invalid = False
+
     def validate(self) -> bool:
         print("MainWindow.validate() called...")
         valid: bool = True
+        # First validate properties against schema
         for p in self.properties.values():
             if not p.validate():
                 valid = False
+        # Now make sure meta properties (like output filename) are valid
+        if self.export_filename.get() == '':
+            self.set_export_filename_invalid(True)
+        else:
+            self.set_export_filename_invalid(False)
         return valid
+
+    def set_export_filename(self):
+        export_filename = filedialog.asksaveasfilename(title="Select metadata output",
+                                                       filetypes=(('JSON','*.json'),))
+        self.export_filename.set(export_filename)
+        if self.export_filename.get() == '':
+            self.set_export_filename_invalid(True)
+        else:
+            self.set_export_filename_invalid(False)
+
 
     def __init__(self, root: tk.Tk, schema: SchemaObject) -> None:
         self.properties: dict[str, SchemaNodeWidgetsRenderer] = {}
@@ -119,6 +144,17 @@ class MainWindow:
             if isinstance(v, SchemaRef):
                 self.properties[v.name] = SchemaRefWidgetsRenderer(self.main_frame, v, self.state)
 
+        self.export_frame = tk.LabelFrame(self.main_frame, text='Export', padx=self.hor_pad, pady=self.ver_pad)
+        self.filename_label = tk.Label(self.export_frame, text='Filename')
+        self.filename_label.grid(column=0, row=0)
+        self.export_filename = tk.StringVar()
+        self.filename_entry = tk.Entry(self.export_frame, highlightthickness=1, textvariable=self.export_filename)
+        self.filename_entry.grid(column=1, row=0)
+        self.filename_button = tk.Button(self.export_frame, text='Choose...', command=self.set_export_filename)
+        self.filename_button.grid(column=3, row=0)
+        self.set_export_filename_invalid(False)
+        self.export_frame.pack(fill='x')
+
         # Set up buttons for direct actions
         self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
         self.validate_button = tk.Button(self.button_frame, text="Validate", command=self.validate)
@@ -126,6 +162,7 @@ class MainWindow:
         self.exit_button = tk.Button(self.button_frame, text="Quit", command=root.destroy)
         self.exit_button.grid(row=0, column=1)
         self.button_frame.pack(fill='x')
+
 
         # self.setup_button = tk.Button(self.button_frame, text='Setup', command=self.on_setup)
         # self.status_button = tk.Button(self.button_frame, text='Status', command=self.on_status)
