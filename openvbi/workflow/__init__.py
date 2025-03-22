@@ -39,7 +39,7 @@ class Workflow(Protocol):
     def process_file(self, infile: str | Path, outfile: str | Path) -> Tuple[bool,Dict]:
         pass
 
-def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workflow) -> Tuple[bool,List[Path],List[Dict]]:
+def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workflow) -> Tuple[bool,List[str],List[Dict]]:
     errors = []
     processed = []
     rc = True
@@ -47,7 +47,7 @@ def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workfl
     outdir: Path = Path(outputdir)
     files: list[Path] = indir.glob(f'*{workflow.insuffix()}')
     for file in files:
-        if file.is_file() and file.suffix == workflow.insuffix():
+        if file.is_file():
             outfile = outdir / file.with_suffix(workflow.outsuffix()).name
             result, err = workflow.process_file(file, outfile)
             if result:
