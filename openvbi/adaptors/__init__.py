@@ -30,7 +30,7 @@ from openvbi.core.observations import Dataset
 class Loader(Protocol):
     def suffix(self) -> str:
         pass
-    def load(self, filename: str) -> Dataset:
+    def load(self, filename: str | Path) -> Dataset:
         pass
 
 class Writer(Protocol):

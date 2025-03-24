@@ -86,7 +86,7 @@ class GeoJSONWriter(Writer):
             feature_lst.append(dict(feature))
         data = dataset.meta.metadata()
         data['features'] = feature_lst
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, **kwargs)
 
 class CSVWriter(Writer):

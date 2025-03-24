@@ -9,6 +9,8 @@ loader = YDVRLoader()
 data = loader.load('/data/00030095.DAT')
 data.generate_observations('Depth')
 
+data.meta.setVesselName('S/V Mjölnir')
+
 # Calibrate acceptable depth and time windows for data (note that these are simply for
 # demonstration purposes: this cuts off a lot of valid data!)
 min_depth = data.depths['z'].min()
