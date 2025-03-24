@@ -3,10 +3,11 @@ requires = ["setuptools>=76.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-dynamic = ["version"]
+dynamic = ["version", "dependencies", "optional-dependencies"]
 name = "openvbi"
 authors = [
-    { name="Brian Calder", email="brc@ccom.unh.edu" }
+    { name="Brian Calder", email="brc@ccom.unh.edu" },
+    { name="Brian Miles", email="bmiles@ccom.unh.edu" }
 ]
 description = "Open Volunteer Bathymetric Information reference code implementation"
 readme = "README.md"
@@ -15,23 +16,6 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-    "numpy>=2.0.0",
-    "csbschema~=1.1.2",
-    "marulc~=0.2.0",
-    "geopandas~=1.0.1",
-    "requests>=2.32.3",
-]
-
-[project.optional-dependencies]
-test = [
-    "flake8",
-    "unittest-xml-reporting~=3.2.0",
-    "lxml~=5.3.1",
-    "pytest~=8.3.5",
-    "pytest-cov~=6.0.0",
-    "pytest-xdist~=3.6.1",
-]
 
 [project.urls]
 "Homepage" = "https://github.com/CCOMJHC/OpenVBI"
@@ -39,3 +23,5 @@ test = [
 
 [tool.setuptools.dynamic]
 version = {attr = "openvbi.__version__"}
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies = {test = {file = ["requirements-test.txt"]}}

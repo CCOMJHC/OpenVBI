@@ -1,7 +1,7 @@
 import uuid
-from openvbi.adaptors.ydvr import load_data
+from openvbi.adaptors.ydvr import YDVRLoader
 import openvbi.core.metadata as md
-from openvbi.adaptors.dcdb import write_geojson, write_csv_json
+from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
 # In order to fill out the metadata, we need a DCDB-style Trusted Node identification string,
 # and some core data for the provider and e-mail.
@@ -16,7 +16,8 @@ provider_email = 'hello@openvbi.org'
 unique_id = dcdb_id + '-' + str(uuid.uuid4())
 
 # Load from YachtDevices, and convert into a dataframe
-data = load_data('/Users/brc/Projects-Extras/OpenVBI/ExampleData/00030095.DAT')
+loader = YDVRLoader()
+data = loader.load('/data/00030095.DAT')
 
 # Since there isn't a lot of information on the logger from the datafile, we need to populate the
 # metadata separately.  We focus here on the mandatory metadata.  In practice, you would probably want
@@ -35,5 +36,7 @@ data.generate_observations('Depth')
 # keyword parameters here are passed on to json.dump() directly, so you can control the output
 # a little more directly.  Using "indent" here gives something that's more verbose but easier
 # to read.
-write_geojson(data, '00030095.json', indent=2)
-write_csv_json(data, '00030095_copy', indent=2)
+writer = GeoJSONWriter()
+writer.write(data, '/data/00030095.json', indent=2)
+writer = CSVWriter()
+writer.write(data, '/data/00030095_copy', indent=2)

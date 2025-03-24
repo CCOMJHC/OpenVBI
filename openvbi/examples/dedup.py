@@ -2,7 +2,7 @@ import time
 import pandas
 import geopandas
 import json
-from openvbi.core.observations import Dataset
+from openvbi.adaptors.generic_ascii import PreparsedASCIILoader
 from openvbi.filters.deduplicate import deduplicate
 import openvbi.core.metadata as md
 
@@ -12,11 +12,8 @@ def report_metadata(m: md.Metadata, tag: str) -> None:
     print(d)
 
 startTime = time.perf_counter()
-data = Dataset()
-depths = pandas.read_csv('/Users/brc/Projects-Extras/OpenVBI/ExampleData/wibl-raw.20.csv')
-# The file used for example here has "Epoch,Longitude,Latitude,Depth" as input columns, so we have to translate.
-depths = depths.rename(columns={'Epoch': 't', 'Longitude': 'lon', 'Latitude': 'lat', 'Depth': 'z'})
-data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
+loader = PreparsedASCIILoader()
+data = loader.load('/data/wibl-raw.N1K.csv')
 endTime = time.perf_counter()
 print(f'LoadData:             {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
