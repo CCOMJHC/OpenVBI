@@ -22,7 +22,7 @@ from pathlib import Path
 import json
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
-    SchemaLeafString, SchemaArray
+    SchemaLeafString, SchemaArray, SchemaLeafInteger
 
 
 class SchemaNodeWidgetsRenderer(ABC):
@@ -61,6 +61,56 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
         return True
 
 
+class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaLeafInteger, state: dict, row: int, column: int,
+                 *,
+                 pad_x: int = 10,
+                 pad_y: int = 5):
+        self.name = name
+        self.required = leaf.required
+        self.minimum = leaf.minimum
+        self.maximum = leaf.maximum
+        self.stringVar = tk.StringVar()
+        state[name] = self.stringVar
+        self.entry = tk.Entry(parent_frame, highlightthickness=1, textvariable=state[name])
+        self.entry.grid(column=column, row=row)
+        self.set_invalid(False)
+
+    def set_invalid(self, is_invalid: bool):
+        if is_invalid:
+            self.entry.configure(highlightbackground="red", highlightcolor="red", highlightthickness=1)
+            self.is_invalid = True
+        else:
+            self.entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
+            self.is_invalid = False
+
+    def validate(self) -> bool:
+        print("SchemaLeafIntegerRenderer.validate() called...")
+        if self.required and self.stringVar.get() == '':
+            print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
+            self.set_invalid(True)
+            return False
+
+        try:
+            int_val: int = int(self.stringVar.get())
+        except ValueError:
+            self.set_invalid(True)
+            return False
+
+        if self.minimum:
+            if int_val < self.minimum:
+                self.set_invalid(True)
+                return False
+
+        if self.maximum:
+            if int_val > self.maximum:
+                self.set_invalid(True)
+                return False
+
+        self.set_invalid(False)
+        return True
+
+
 class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
     def __init__(self, parent_frame, name: str, obj: SchemaObject, state: dict,
                  *,
@@ -75,6 +125,8 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
             tk.Label(parent_frame, text=prop).grid(column=0, row=row)
             if isinstance(value, SchemaLeafString):
                 self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+            if isinstance(value, SchemaLeafInteger):
+                self.properties[prop] = SchemaLeafIntegerRenderer(parent_frame, prop, value, self.state, column=1, row=row)
             if isinstance(value, SchemaArray):
                 array_frame = tk.Frame(parent_frame)
                 self.properties[prop] = SchemaArrayWidgetsRenderer(array_frame, prop, value, self.state)

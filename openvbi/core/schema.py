@@ -354,6 +354,38 @@ class SchemaLeafString(SchemaLeaf):
         self.description = d.get('description')
         self.pattern = d.get('pattern')
 
+class SchemaLeafInteger(SchemaLeaf):
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent, required=required)
+
+        self.title: str | None
+        self.description: str | None
+        self.minimum: int | None
+        self.maximum: int | None
+
+        # Initialize object from dict
+        self._from_dict(d)
+
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t\t' * depth
+        title = self.title if self.title is not None else 'nil'
+        desc = self.description if self.description is not None else 'nil'
+        minimum = self.minimum if self.minimum is not None else 'nil'
+        maximum = self.maximum if self.maximum is not None else 'nil'
+        parent = self.parent.name if self.parent is not None else 'nil'
+        return (f"{indent_root}SchemaLeafInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
+                f"description: {desc},\n{indent}minimum: {minimum},\n{indent}maximum: {maximum},\n{indent}parent: {parent},\n{indent}"
+                f"required: {self.required})")
+
+    def _from_dict(self, d: dict):
+        self.title = d.get('title')
+        self.description = d.get('description')
+        self.minimum = d.get('minimum')
+        self.maximum = d.get('maximum')
+
 
 def parse_reference(schema: dict, parent: SchemaNode) -> SchemaRef:
     if '$ref' not in schema:
@@ -388,6 +420,12 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
             else:
                 is_required = required
             return SchemaLeafString(name, path, parent, schema, required=is_required)
+        case 'integer':
+            if required is None:
+                is_required = False
+            else:
+                is_required = required
+            return SchemaLeafInteger(name, path, parent, schema, required=is_required)
         case _:
             print(f"Have not yet implemented parsing of schema of type {schema['type']}")
 
