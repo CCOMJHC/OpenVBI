@@ -22,7 +22,7 @@ from pathlib import Path
 import json
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
-    SchemaLeafString
+    SchemaLeafString, SchemaArray
 
 
 class SchemaNodeWidgetsRenderer(ABC):
@@ -75,6 +75,10 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
             tk.Label(parent_frame, text=prop).grid(column=0, row=row)
             if isinstance(value, SchemaLeafString):
                 self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+            if isinstance(value, SchemaArray):
+                array_frame = tk.Frame(parent_frame)
+                self.properties[prop] = SchemaArrayWidgetsRenderer(array_frame, prop, value, self.state)
+                array_frame.grid(column=1, row=row)
             row += 1
 
     def validate(self) -> bool:
@@ -84,6 +88,46 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
             if not p.validate():
                 valid = False
         return valid
+
+
+class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
+    hor_pad = 10
+    ver_pad = 5
+
+    def __init__(self, parent: tk.Frame, name: str, arr: SchemaArray, state: dict,
+                 *,
+                 pad_x: int = 10,
+                 pad_y: int = 5) -> None:
+        self.state = {}
+        state[name] = self.state
+        self.parent = parent
+        self.arr = arr
+        self.is_open = False
+
+        self.preview = tk.Label(parent, text="$PREVIEW")
+        self.preview.grid(column=0, row=0)
+        self.open_button = tk.Button(parent, text="Edit...", command=self.open)
+        self.open_button.grid(column=1, row=0)
+
+    def open(self):
+        if not self.is_open:
+            self.root = tk.Toplevel(self.parent)
+            self.main_frame = tk.Frame(self.root, padx=self.hor_pad, pady=self.ver_pad)
+            self.main_frame.pack(fill='both')
+
+            # Set up buttons for direct actions
+            self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
+            self.save_button = tk.Button(self.button_frame, text="Save", command=self.save)
+            self.save_button.grid(row=0, column=0)
+            self.button_frame.pack(fill='x')
+            self.is_open = True
+
+    def save(self):
+        if self.is_open:
+            print('TODO save...')
+            self.root.grab_release()
+            self.root.destroy()
+            self.is_open = False
 
 
 class SchemaRefWidgetsRenderer(SchemaNodeWidgetsRenderer):
@@ -119,7 +163,6 @@ def generate_output(d: dict) -> dict:
         elif isinstance(v, tk.StringVar):
             ser[k] = v.get()
     return ser
-
 
 class MainWindow:
     hor_pad = 10
