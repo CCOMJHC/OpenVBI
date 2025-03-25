@@ -332,9 +332,10 @@ class SchemaLeafString(SchemaLeaf):
                  required: bool = False):
         super().__init__(name, path, parent, required=required)
 
-        self.title: str | None
-        self.description: str | None
-        self.pattern: str | None
+        self.title: str | None = None
+        self.description: str | None = None
+        self.pattern: str | None = None
+        self.enum_values: set | None = None
 
         # Initialize object from dict
         self._from_dict(d)
@@ -354,6 +355,8 @@ class SchemaLeafString(SchemaLeaf):
         self.title = d.get('title')
         self.description = d.get('description')
         self.pattern = d.get('pattern')
+        if 'enum' in d and isinstance(d['enum'], list):
+            self.enum_values: set | None = set(d['enum'])
 
 class SchemaLeafInteger(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,

@@ -1,9 +1,7 @@
 """
 TODO:
-    - Add validation for patterns
-    - Add support for non-string fields (integer, enum, array)
-    - Add * to label for required fields
-    - Right justify labels
+    - Add support for non-string fields (enum, array)
+    - Add invalid indication for enum fields
     - Use localization to provide friendly names for fields
     - Add tooltips with descriptions for fields
     - For fields that are controlled vocabularies, provide drop-downs instead of free text
@@ -17,6 +15,7 @@ from abc import ABC
 from typing import cast
 import sys
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog
 from pathlib import Path
 import json
@@ -70,6 +69,44 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True
 
+class SchemaLeafStringEnumRenderer(SchemaNodeWidgetsRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaLeafString, state: dict, row: int, column: int,
+                 *,
+                 pad_x: int = 10,
+                 pad_y: int = 5):
+        if leaf.enum_values is None:
+            raise ValueError("Expected enum values in SchemaLeafString, but there were none.")
+
+        self.name = name
+        self.required = leaf.is_required
+        self.stringVar = tk.StringVar()
+        state[name] = self.stringVar
+        self.entry = ttk.Combobox(parent_frame, textvariable=state[name])
+        values = list(leaf.enum_values)
+        self.entry['values'] = list(leaf.enum_values)
+        self.stringVar.set(values[0])
+        self.entry.grid(column=column, row=row)
+        self.set_invalid(False)
+
+    def set_invalid(self, is_invalid: bool):
+        if is_invalid:
+            # TODO: Add red frame styling to indicate invalid
+            # self.entry.configure(bordercolor='red')
+            self.is_invalid = True
+        else:
+            # TODO: Remove red frame styling to indicate valid
+            # self.entry.configure(bordercolor='grey')
+            self.is_invalid = False
+
+    def validate(self) -> bool:
+        print("SchemaLeafStringRenderer.validate() called...")
+        if self.required and self.stringVar.get() == '':
+            print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
+            self.set_invalid(True)
+            return False
+
+        self.set_invalid(False)
+        return True
 
 class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
     def __init__(self, parent_frame, name: str, leaf: SchemaLeafInteger, state: dict, row: int, column: int,
@@ -141,7 +178,10 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
                 label: str = prop
             tk.Label(parent_frame, text=label, anchor='e', justify='right').grid(sticky=tk.E, column=0, row=row)
             if isinstance(value, SchemaLeafString):
-                self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                if value.enum_values is None:
+                    self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                else:
+                    self.properties[prop] = SchemaLeafStringEnumRenderer(parent_frame, prop, value, self.state, column=1, row=row)
             if isinstance(value, SchemaLeafInteger):
                 self.properties[prop] = SchemaLeafIntegerRenderer(parent_frame, prop, value, self.state, column=1, row=row)
             if isinstance(value, SchemaArray):
