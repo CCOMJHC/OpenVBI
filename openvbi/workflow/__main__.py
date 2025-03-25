@@ -35,7 +35,7 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
                  pad_x: int = 10,
                  pad_y: int = 5):
         self.name = name
-        self.required = leaf.required
+        self.required = leaf.is_required
         self.pattern = leaf.pattern
         self.stringVar = tk.StringVar()
         state[name] = self.stringVar
@@ -67,7 +67,7 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
                  pad_x: int = 10,
                  pad_y: int = 5):
         self.name = name
-        self.required = leaf.required
+        self.required = leaf.is_required
         self.minimum = leaf.minimum
         self.maximum = leaf.maximum
         self.stringVar = tk.StringVar()
@@ -122,7 +122,14 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
 
         row = 0
         for prop, value in obj.properties.items():
-            tk.Label(parent_frame, text=prop).grid(column=0, row=row)
+            if value is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            if value.is_required:
+                label: str = f"{prop}*"
+            else:
+                label: str = prop
+            tk.Label(parent_frame, text=label, anchor='e', justify='right').grid(sticky=tk.E, column=0, row=row)
             if isinstance(value, SchemaLeafString):
                 self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
             if isinstance(value, SchemaLeafInteger):
@@ -156,7 +163,7 @@ class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
         self.arr = arr
         self.is_open = False
 
-        self.preview = tk.Label(parent, text="$PREVIEW")
+        self.preview = tk.Label(parent, text="$PREVIEW", anchor='e')
         self.preview.grid(column=0, row=0)
         self.open_button = tk.Button(parent, text="Edit...", command=self.open)
         self.open_button.grid(column=1, row=0)
@@ -280,7 +287,7 @@ class MainWindow:
                 self.properties[v.name] = SchemaRefWidgetsRenderer(self.main_frame, v, self.state)
 
         self.export_frame = tk.LabelFrame(self.main_frame, text='Export', padx=self.hor_pad, pady=self.ver_pad)
-        self.filename_label = tk.Label(self.export_frame, text='Filename')
+        self.filename_label = tk.Label(self.export_frame, text='Filename', anchor='e')
         self.filename_label.grid(column=0, row=0)
         self.export_filename = tk.StringVar()
         self.filename_entry = tk.Entry(self.export_frame, highlightthickness=1, textvariable=self.export_filename)

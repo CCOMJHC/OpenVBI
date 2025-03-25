@@ -34,13 +34,16 @@ class SchemaNode(ABC):
     """
     Parent class for all schema nodes
     """
-    def __init__(self, name: str | None, path: str | None, parent: Optional['SchemaNode']):
+    def __init__(self, name: str | None, path: str | None, parent: Optional['SchemaNode'],
+                 *,
+                 required: bool = False):
         self.name: str = name
         if path is None:
             self.path = "#/"
         else:
             self.path = path
         self.parent: Optional['SchemaNode'] = parent
+        self.is_required = required
 
     def to_string(self, *, depth: int = 1) -> str:
         pass
@@ -189,9 +192,8 @@ class SchemaArray(SchemaNode):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
                  *,
                  required: bool = False):
-        super().__init__(name, path, parent)
+        super().__init__(name, path, parent, required=required)
 
-        self.required: bool = required
         self.unique_items: bool | None = None
         self.min_items: int | None = None
         self.max_items: int | None = None
@@ -212,7 +214,7 @@ class SchemaArray(SchemaNode):
         parent = self.parent.name if self.parent is not None else 'nil'
         o = io.StringIO()
         o.write(f"{indent_root}SchemaArray(name: {self.name}, path: {self.path}, parent: {parent},\n")
-        o.write(f"{indent}required: {self.required},\n")
+        o.write(f"{indent}required: {self.is_required},\n")
         o.write(f"{indent}uniqueItems: {self.unique_items}\n")
         o.write(f"{indent}minItems: {self.min_items},\n")
         o.write(f"{indent}maxItems: {self.max_items},\n")
@@ -322,8 +324,7 @@ class SchemaLeaf(SchemaNode, ABC):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None,
                  *,
                  required: bool = False):
-        super().__init__(name, path, parent)
-        self.required = required
+        super().__init__(name, path, parent, required=required)
 
 class SchemaLeafString(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
@@ -347,7 +348,7 @@ class SchemaLeafString(SchemaLeaf):
         parent = self.parent.name if self.parent is not None else 'nil'
         return (f"{indent_root}SchemaLeafString(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent},\n{indent}"
-                f"required: {self.required})")
+                f"required: {self.is_required})")
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
@@ -378,7 +379,7 @@ class SchemaLeafInteger(SchemaLeaf):
         parent = self.parent.name if self.parent is not None else 'nil'
         return (f"{indent_root}SchemaLeafInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}minimum: {minimum},\n{indent}maximum: {maximum},\n{indent}parent: {parent},\n{indent}"
-                f"required: {self.required})")
+                f"required: {self.is_required})")
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
