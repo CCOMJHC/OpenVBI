@@ -34,7 +34,7 @@ class SchemaNode(ABC):
     """
     Parent class for all schema nodes
     """
-    def __init__(self, name: str, path: str | None, parent: Optional['SchemaNode']):
+    def __init__(self, name: str | None, path: str | None, parent: Optional['SchemaNode']):
         self.name: str = name
         if path is None:
             self.path = "#/"
@@ -54,11 +54,17 @@ class SchemaNode(ABC):
         else:
             return f"{self.parent.get_path()}/{self.name}"
 
+    def join_path(self, child: str) -> str:
+        if self.path.endswith('/'):
+            return f"{self.path}{child}"
+        else:
+            return f"{self.path}/{child}"
+
 class SchemaRef(SchemaNode):
     """
     Reference to another entity
     """
-    def __init__(self, name: str, path: str, parent: SchemaNode):
+    def __init__(self, name: str | None, path: str, parent: SchemaNode):
         super().__init__(name, path, parent)
         self.referent: SchemaNode | None = None
 
@@ -126,7 +132,9 @@ class SchemaObject(SchemaNode):
                 continue
             if isinstance(node, SchemaObject):
                 node.resolve_refs(defs=d)
-            if isinstance(node, SchemaRef):
+            elif isinstance(node, SchemaArray):
+                node.resolve_refs(defs=d)
+            elif isinstance(node, SchemaRef):
                 if node.path not in d:
                     print("WARNING: Unable to resolve reference for node path {node.path}")
                 else:
@@ -138,6 +146,8 @@ class SchemaObject(SchemaNode):
                 # TODO: Remove after we have implemented all node types, after which no nodes will be None
                 continue
             if isinstance(node, SchemaObject):
+                node.resolve_refs(defs=d)
+            elif isinstance(node, SchemaArray):
                 node.resolve_refs(defs=d)
             if isinstance(node, SchemaRef):
                 if node.path not in d:
@@ -166,11 +176,7 @@ class SchemaObject(SchemaNode):
                         self.defs_keys.add(ref_path_components[1])
                     else:
                         # Property is a non-reference node
-                        if self.path.endswith('/'):
-                            path: str = f"{self.path}{k}"
-                        else:
-                            path: str = f"{self.path}/{k}"
-                        self.properties[k] = parse_schema(v, path, k, self, required=k in self.required)
+                        self.properties[k] = parse_schema(v, self.join_path(k), k, self, required=k in self.required)
         # Attempt to process defs
         for ref in self.defs_keys:
             if ref in d:
@@ -178,6 +184,136 @@ class SchemaObject(SchemaNode):
                     path: str = f"{self.path}{ref}/{k}"
                     parsed: SchemaNode = parse_schema(v, path, k, self)
                     self.defs[path] = parsed
+
+class SchemaArray(SchemaNode):
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent)
+
+        self.required: bool = required
+        self.unique_items: bool | None = None
+        self.min_items: int | None = None
+        self.max_items: int | None = None
+
+        self.items: list[SchemaNode] = []
+        self.items_all_of: list[SchemaNode] = []
+        self.items_any_of: list[SchemaNode] = []
+        self.items_one_of: list[SchemaNode] = []
+
+        # Initialize object from dict
+        self._from_dict(d)
+
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t' * (depth-1)
+        indent: str = '\t\t\t' * depth
+        # cont: str = '\t\t\t' * (depth+1)
+        # cont_sub = '\t\t' * (depth+2)
+        parent = self.parent.name if self.parent is not None else 'nil'
+        o = io.StringIO()
+        o.write(f"{indent_root}SchemaArray(name: {self.name}, path: {self.path}, parent: {parent},\n")
+        o.write(f"{indent}required: {self.required},\n")
+        o.write(f"{indent}uniqueItems: {self.unique_items}\n")
+        o.write(f"{indent}minItems: {self.min_items},\n")
+        o.write(f"{indent}maxItems: {self.max_items},\n")
+        o.write(f"{indent}items:\n")
+        for i in self.items:
+            if i is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{i.to_string(depth=depth+1)}\n")
+        o.write(f"{indent}items::allOf:\n")
+        for i in self.items_all_of:
+            if i is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{i.to_string(depth=depth+1)}\n")
+        o.write(f"{indent}items::anyOf:\n")
+        for i in self.items_any_of:
+            if i is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{i.to_string(depth=depth+1)}\n")
+        o.write(f"{indent}items::oneOf:\n")
+        for i in self.items_one_of:
+            if i is None:
+                # TODO: Remove after we have implemented all node types, after which no nodes will be None
+                continue
+            o.write(f"{i.to_string(depth=depth+1)}\n")
+        o.write(f"\n{indent_root})")
+        return o.getvalue()
+
+    def resolve_refs(self, *, defs: dict):
+        print(f"resolving refs for path: {self.path}")
+        for node in self.items:
+            if isinstance(node, SchemaRef):
+                if node.path not in defs:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = defs[node.path]
+        for node in self.items_all_of:
+            if isinstance(node, SchemaRef):
+                if node.path not in defs:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = defs[node.path]
+        for node in self.items_any_of:
+            if isinstance(node, SchemaRef):
+                if node.path not in defs:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = defs[node.path]
+        for node in self.items_one_of:
+            if isinstance(node, SchemaRef):
+                if node.path not in defs:
+                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                else:
+                    node.referent = defs[node.path]
+
+    def _from_dict(self, d: dict):
+        self.unique_items = d.get('uniqueItems', False)
+        if 'minItems' in d:
+            self.min_items = d['minItems']
+        if 'maxItems' in d:
+            self.max_items = d['maxItems']
+        if 'items' in d:
+            items: dict = d['items']
+            if 'allOf' in items:
+                all_of_items: list[dict] = items['allOf']
+                for i in all_of_items:
+                    for k, v in i.items():
+                        path: str = self.join_path(f"items/allOf/{k}")
+                        if '$ref' in v:
+                            self.items_all_of.append(parse_reference(i, self))
+                        else:
+                            self.items_all_of.append(parse_schema(v, path, k, self, required=True))
+            elif 'anyOf' in items:
+                any_of_items: list[dict] = items['anyOf']
+                for i in any_of_items:
+                    for k, v in i.items():
+                        if '$ref' in k:
+                            self.items_any_of.append(parse_reference(i, self))
+                        else:
+                            path: str = self.join_path(f"items/anyOf/{k}")
+                            self.items_any_of.append(parse_schema(v, path, k, self, required=False))
+            elif 'oneOf' in items:
+                one_of_items: list[dict] = items['oneOf']
+                for i in one_of_items:
+                    for k, v in i.items():
+                        if '$ref' in k:
+                            self.items_one_of.append(parse_reference(i, self))
+                        else:
+                            path: str = self.join_path(f"items/oneOf/{k}")
+                            self.items_one_of.append(parse_schema(v, path, k, self, required=True))
+            else:
+                for k in items.keys():
+                    match k:
+                        case '$ref':
+                            self.items_all_of.append(parse_reference(items, self))
+                        case 'type':
+                            path: str = self.join_path('items')
+                            self.items_one_of.append(parse_schema(items, path, k, self, required=True))
+
 
 class SchemaLeaf(SchemaNode, ABC):
     """
@@ -219,6 +355,12 @@ class SchemaLeafString(SchemaLeaf):
         self.pattern = d.get('pattern')
 
 
+def parse_reference(schema: dict, parent: SchemaNode) -> SchemaRef:
+    if '$ref' not in schema:
+        raise ValueError(f"schema must contain '$ref' key but did not")
+    return SchemaRef(None, schema['$ref'], parent)
+
+
 S = TypeVar('S', bound=SchemaNode | None)
 def parse_schema(schema: dict, path: str | None, name: str | None, parent: SchemaNode | None,
                  *,
@@ -238,6 +380,8 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
     match schema['type']:
         case 'object':
             return SchemaObject(name, path, parent, schema)
+        case 'array':
+            return SchemaArray(name, path, parent, schema)
         case 'string':
             if required is None:
                 is_required = False
