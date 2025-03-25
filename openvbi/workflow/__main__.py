@@ -20,6 +20,7 @@ import tkinter as tk
 from tkinter import filedialog
 from pathlib import Path
 import json
+import re
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
     SchemaLeafString, SchemaArray, SchemaLeafInteger
@@ -36,7 +37,10 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
                  pad_y: int = 5):
         self.name = name
         self.required = leaf.is_required
-        self.pattern = leaf.pattern
+        if leaf.pattern is not None:
+            self.pattern = re.compile(leaf.pattern)
+        else:
+            self.pattern = None
         self.stringVar = tk.StringVar()
         state[name] = self.stringVar
         self.entry = tk.Entry(parent_frame, highlightthickness=1, textvariable=state[name])
@@ -57,6 +61,12 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
             print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
             self.set_invalid(True)
             return False
+
+        if self.pattern is not None:
+            if self.pattern.fullmatch(self.stringVar.get()) is None:
+                self.set_invalid(True)
+                return False
+
         self.set_invalid(False)
         return True
 
