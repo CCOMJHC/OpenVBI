@@ -57,7 +57,7 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
 
     def validate(self) -> bool:
         print("SchemaLeafStringRenderer.validate() called...")
-        if self.required and self.stringVar.get() is '':
+        if self.required and self.stringVar.get() == '':
             print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
             self.set_invalid(True)
             return False
