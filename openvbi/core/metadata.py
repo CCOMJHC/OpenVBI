@@ -40,6 +40,8 @@ import datetime as dt
 import tempfile
 import os
 import json
+import copy
+import deepmerge
 
 from csbschema.validators import validate_b12_3_1_0_2024_04
 
@@ -99,7 +101,7 @@ class ProcessingType(StrEnum):
 
 class Metadata:
     def __init__(self) -> None:
-        self.meta = mandatoryMetadata.copy()
+        self.meta = copy.deepcopy(mandatoryMetadata)
 
     def setProviderID(self, providerName: str, providerEmail: str) -> None:
         self.meta['properties']['trustedNode']['providerOrganizationName'] = providerName
@@ -247,12 +249,18 @@ class Metadata:
         if 'processing' not in self.meta['properties']:
             self.meta['properties']['processing'] = list()
         self.meta['properties']['processing'].append(element)
+        self.meta['properties']['platform']['dataProcessed'] = True
 
     def render(self, filename: Union[Path,str]) -> None:
-        metadata = self.meta
+        metadata = copy.deepcopy(self.meta)
         metadata['features'] = []
         with open(filename, 'w') as f:
             json.dump(metadata, f)
+
+    def inspect(self) -> None:
+        metadata = copy.deepcopy(self.meta)
+        metadata['features'] = []
+        print(json.dumps(metadata, indent=2))
 
     def metadata(self) -> Dict[str,Any]:
         return self.meta
@@ -270,14 +278,22 @@ class Metadata:
             return valid, None
         else:
             return valid, result['errors']
+        
+    def valid(self) -> bool:
+        rc, _ = self.validate()
+        return rc
 
     def adopt(self, metadata: Dict[str,Any]) -> None:
         if 'type' not in metadata or 'crs' not in metadata or 'properties' not in metadata:
             raise ValueError()
-        self.meta = dict()
-        self.meta['type'] = metadata['type']
-        self.meta['crs'] = metadata['crs']
-        self.meta['properties'] = metadata['properties']
+        self.meta = copy.deepcopy(metadata)
+        result, error = self.validate()
+        if not result:
+            print(error)
+            raise ValueError()
+
+    def update(self, updates: Dict[str,Any]) -> None:
+        deepmerge.always_merger.merge(self.meta, updates)
         result, error = self.validate()
         if not result:
             print(error)
