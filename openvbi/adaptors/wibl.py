@@ -27,6 +27,7 @@ class WIBLLoader(Loader):
         logger_UUID: str = 'NONE'
         ship_name: str = 'Anonymous'
         firmware_version: str = '0.0.0'
+        metadata = None
 
         with open(filename, 'rb') as f:
             source = LoggerFile.PacketFactory(f)
@@ -46,7 +47,6 @@ class WIBLLoader(Loader):
                     if pkt.name() == 'JSONMetadata':
                         # This is optional
                         metadata = json.loads(pkt.metadata_element.decode('utf-8'))
-                        data.meta.update(metadata)
                     if pkt.name() == 'SerialString':
                         # Raw NMEA0183 strings
                         packet = RawN0183Obs(pkt.elapsed, pkt.data.decode('utf-8').strip())
@@ -59,8 +59,12 @@ class WIBLLoader(Loader):
                 except LoggerFile.PacketTranscriptionError:
                     pass
         
+        # Set up the basic identification (which should always exist)
         data.meta.setIdentifiers(logger_UUID, 'WIBL', firmware_version)
         data.meta.setVesselName(ship_name)
+        # If JSON metadata was provided, overlay it last
+        if metadata:
+            data.meta.update(metadata)
         # In a WIBL file, it's possible that you have a full JSON metadata record embedded in the file,
         # and therefore you don't want to just over-ride the metadata --- it could be set for you!  We
         # therefore check whether the "NOTSET" detault from metadata.py is still set in some useful
