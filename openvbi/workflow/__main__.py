@@ -17,13 +17,17 @@ from abc import ABC
 from typing import cast
 import sys
 import tkinter as tk
+from tkinter import ttk, messagebox
 from tkinter import filedialog
 from pathlib import Path
 import json
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject, SchemaRef, \
     SchemaLeafString
-
+from openvbi.adaptors.factory import LoaderLibrary, LoaderFactory, WriterLibrary, WriterFactory, DepthMsgLibrary, DepthMsgTag
+from openvbi.workflow.basic_workflow import BasicWorkflow
+from openvbi.workflow import apply_workflow
+from openvbi.core.metadata import Metadata
 
 class SchemaNodeWidgetsRenderer(ABC):
     def validate(self) -> bool:
@@ -121,7 +125,7 @@ def generate_output(d: dict) -> dict:
     return ser
 
 
-class MainWindow:
+class MetadataMainWindow:
     hor_pad = 10
     ver_pad = 5
 
@@ -151,6 +155,7 @@ class MainWindow:
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
                                                        filetypes=(('JSON','*.json'),))
         self.export_filename.set(export_filename)
+        self.filename_entry.xview_moveto(1.0)
         if self.export_filename.get() == '':
             self.set_export_filename_invalid(True)
         else:
@@ -175,9 +180,9 @@ class MainWindow:
         # Dict to hold state variables that will be used to generate a JSON document based on the schema
         self.state = {}
 
-        self.root = root
+        self.root = tk.Toplevel(root)
 
-        self.main_frame = tk.Frame(root, padx=self.hor_pad, pady=self.ver_pad)
+        self.main_frame = tk.Frame(self.root, padx=self.hor_pad, pady=self.ver_pad)
         self.main_frame.pack(fill='both')
 
         for v in schema.properties.values():
@@ -204,7 +209,7 @@ class MainWindow:
         self.export_button = tk.Button(self.button_frame, text="Export", command=self.do_export)
         self.export_button.grid(row=0, column=1)
 
-        self.exit_button = tk.Button(self.button_frame, text="Quit", command=root.destroy)
+        self.exit_button = tk.Button(self.button_frame, text="Quit", command=self.root.destroy)
         self.exit_button.grid(row=0, column=2)
 
         self.button_frame.pack(fill='x')
@@ -228,13 +233,160 @@ class MainWindow:
         # self.transfer_button.grid(row=0, column=6)
         # self.restart_button.grid(row=0, column=7)
 
+class MainWindow():
+    hor_pad = 10
+    ver_pad = 5
+
+    def __init__(self, root: tk.Tk, schema_object: SchemaObject) -> None:
+        self.schema_object = schema_object
+
+        # Text variables for the various input entry widgets
+        self.input_directory = tk.StringVar()
+        self.output_directory = tk.StringVar()
+        self.loader = tk.StringVar()
+        self.writer = tk.StringVar()
+        self.depth_message = tk.StringVar()
+        self.metadata_file = tk.StringVar()
+
+        self.root = root
+        self.main_frame = tk.Frame(root, padx=self.hor_pad, pady=self.ver_pad)
+        self.main_frame.pack(fill='both')
+
+        # Set up input side (left) with the various input components
+        self.input_frame = tk.LabelFrame(self.main_frame, text='Inputs', padx=self.hor_pad, pady=self.ver_pad)
+        self.input_frame.grid(row=0, column=0, sticky='n')
+
+        self.input_directory_label = tk.Label(self.input_frame, text='Input Directory', anchor='e')
+        self.input_directory_entry = tk.Entry(self.input_frame, textvariable=self.input_directory)
+        self.input_directory_button = tk.Button(self.input_frame, text='...', command=self.on_set_indir)
+        self.input_directory_label.grid(row=0, column=0)
+        self.input_directory_entry.grid(row=0, column=1)
+        self.input_directory_button.grid(row=0, column=2)
+
+        self.output_directory_label = tk.Label(self.input_frame, text='Output Directory', anchor='e')
+        self.output_directory_entry = tk.Entry(self.input_frame, textvariable=self.output_directory)
+        self.output_directory_button = tk.Button(self.input_frame, text='...', command=self.on_set_outdir)
+        self.output_directory_label.grid(row=1, column=0)
+        self.output_directory_entry.grid(row=1, column=1)
+        self.output_directory_button.grid(row=1, column=2)
+
+        self.workflow_frame = tk.LabelFrame(self.input_frame, text='Workflow', padx=self.hor_pad, pady=self.ver_pad)
+        self.workflow_frame.grid(row=2, columnspan=3)
+
+        self.workflow_loader_label = tk.Label(self.workflow_frame, text='Loader', anchor='e')
+        self.workflow_loader_combo = ttk.Combobox(self.workflow_frame, textvariable=self.loader,
+                                                  values=LoaderLibrary())
+        self.workflow_loader_combo.current(0)
+        self.workflow_loader_label.grid(row=0, column=0)
+        self.workflow_loader_combo.grid(row=0, column=1)
+
+        self.workflow_writer_label = tk.Label(self.workflow_frame, text='Writer', anchor='e')
+        self.workflow_writer_combo = ttk.Combobox(self.workflow_frame, textvariable=self.writer,
+                                                  values=WriterLibrary())
+        self.workflow_writer_combo.current(0)
+        self.workflow_writer_label.grid(row=1, column=0)
+        self.workflow_writer_combo.grid(row=1, column=1)
+
+        self.workflow_depth_label = tk.Label(self.workflow_frame, text='Depth Mesage', anchor='e')
+        self.workflow_depth_combo = ttk.Combobox(self.workflow_frame, textvariable=self.depth_message,
+                                                 values=DepthMsgLibrary())
+        self.workflow_depth_combo.current(0)
+        self.workflow_depth_label.grid(row=2, column=0)
+        self.workflow_depth_combo.grid(row=2, column=1)
+
+        self.workflow_metadata_label = tk.Label(self.workflow_frame, text='Metadata File', anchor='e')
+        self.workflow_metadata_entry = tk.Entry(self.workflow_frame, textvariable=self.metadata_file)
+        self.workflow_metadata_load_button = tk.Button(self.workflow_frame, text='...', command=self.on_load_metadata)
+        self.workflow_metadata_create_button = tk.Button(self.workflow_frame, text='Create', command=self.on_create_metadata)
+        self.workflow_metadata_label.grid(row=3, column=0)
+        self.workflow_metadata_entry.grid(row=3, column=1)
+        self.workflow_metadata_load_button.grid(row=3, column=2)
+        self.workflow_metadata_create_button.grid(row=3, column=3)
+
+        self.workflow_run_button = tk.Button(self.input_frame, text='Run Workflow', command=self.on_run_workflow)
+        self.workflow_run_button.grid(row=3, columnspan=3)
+
+        # Set up the output side (right) with a window for successful files, and one for problems
+        self.output_frame = tk.LabelFrame(self.main_frame, text='Results', padx=self.hor_pad, pady=self.ver_pad)
+        self.output_frame.grid(row=0, column=1)
+
+        self.success_frame = tk.LabelFrame(self.output_frame, text='Successful Files', padx=self.hor_pad, pady=self.ver_pad)
+        self.success_frame.grid(row=0, column=0)
+
+        self.success_scrollbar = tk.Scrollbar(self.success_frame, orient='vertical')
+        self.success_scrollbar.pack(side=tk.RIGHT, fill='y')
+        self.success_files = tk.Text(self.success_frame, yscrollcommand=self.success_scrollbar.set)
+        self.success_scrollbar.config(command=self.success_files.yview)
+        self.success_files.pack(fill='both')
+
+        self.failed_frame = tk.LabelFrame(self.output_frame, text='Failed Files', padx=self.hor_pad, pady=self.ver_pad)
+        self.failed_frame.grid(row=1, column=0)
+
+        self.failed_scrollbar = tk.Scrollbar(self.failed_frame, orient='vertical')
+        self.failed_scrollbar.pack(side=tk.RIGHT, fill='y')
+        self.failed_files = tk.Text(self.failed_frame, yscrollcommand=self.failed_scrollbar.set)
+        self.failed_scrollbar.config(command=self.failed_files.yview)
+        self.failed_files.pack(fill='both')
+
+    def on_set_indir(self) -> None:
+        input_directory = filedialog.askdirectory(title='Select Input Directory')
+        if input_directory:
+            self.input_directory.set(input_directory)
+            self.input_directory_entry.xview_moveto(1.0)
+
+    def on_set_outdir(self) -> None:
+        output_directory = filedialog.askdirectory(title='Select Output Directory')
+        if output_directory:
+            self.output_directory.set(output_directory)
+            self.output_directory_entry.xview_moveto(1.0)
+
+    def on_load_metadata(self) -> None:
+        json_filename = filedialog.askopenfilename(title='Select JSON Metadata File ...', filetypes=[('JSON Files', '*.json')])
+        if json_filename:
+            self.metadata_file.set(json_filename)
+            self.workflow_metadata_entry.xview_moveto(1.0)
+
+    def on_create_metadata(self) -> None:
+        metadata_widget: MetadataMainWindow = MetadataMainWindow(self.root, self.schema_object)
+        self.root.wait_window(metadata_widget.root)
+
+    def on_run_workflow(self) -> None:
+        # Remove the results of any previous run before starting!
+        self.success_files.delete(1.0, tk.END)
+        self.failed_files.delete(1.0, tk.END)
+
+        loader = LoaderFactory(self.loader.get())
+        writer = WriterFactory(self.writer.get())
+        depth_message = DepthMsgTag(self.depth_message.get())
+        metadata: Metadata = Metadata()
+        if self.metadata_file.get():
+            with open(self.metadata_file.get(), 'r') as f:
+                meta_raw = json.load(f)
+            try:
+                metadata.adopt(meta_raw)
+            except ValueError:
+                print(f'error: failed to process metadata file.')
+                messagebox.showerror(title='Metadata Validation Failure', message=f'Failed to validate metadata from {self.metadata_file.get()}')
+                return
+
+        workflow: BasicWorkflow = BasicWorkflow(loader, depth_message, writer, metadata)
+        rc, succeeded, failed = apply_workflow(self.input_directory.get(), self.output_directory.get(), workflow)
+        if rc:
+            messagebox.showinfo(title='Processing Completed', message='Processing of files completed successfully.')
+        else:
+            messagebox.showerror(title='Processing Completed', message='Processing failed (at least partially) - see messages for details.')
+
+        for file in succeeded:
+            self.success_files.insert(tk.END, file + '\n')
+        for file in failed:
+            self.failed_files.insert(tk.END, f'File: {file["filename"]} stopped at {file["stage"]}\n')
 
 def main():
     schema: dict = open_schema()
     schema_node: SchemaNode = parse_schema(schema, None, None, None)
     schema_obj: SchemaObject = cast(SchemaObject, schema_node)
     schema_obj.resolve_refs()
-    print(f"DEBUG: Parsed schema AFTER resolving refs was:\n{schema_obj.to_string()}")
+    #print(f"DEBUG: Parsed schema AFTER resolving refs was:\n{schema_obj.to_string()}")
 
     # root = Tk()
     # frm = ttk.Frame(root, padding=10)
@@ -248,9 +400,9 @@ def main():
     # ttk.Button(frm, text="Quit", command=root.destroy).grid(column=0, row=row)
 
     root = tk.Tk()
-    root.title("OpenVBI Metadata Generator")
+    root.title("OpenVBI Workflow Tool")
     main_window = MainWindow(root, schema_obj)
-    print(f"DEBUG: state: {main_window.state}")
+    #print(f"DEBUG: state: {main_window.state}")
     root.mainloop()
 
     sys.exit(0)

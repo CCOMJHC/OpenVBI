@@ -41,7 +41,10 @@ class BasicWorkflow(Workflow):
         self.loader = loader
         self.writer = writer
         self.depth_source = depth_source
-        self.metadata = copy.deepcopy(metadata.metadata())
+        if metadata.valid():
+            self.metadata = copy.deepcopy(metadata.metadata())
+        else:
+            self.metadata = None
     
     def insuffix(self):
         return self.loader.suffix()
@@ -56,8 +59,9 @@ class BasicWorkflow(Workflow):
             data: Dataset = self.loader.load(infile)
             errors["stage"] = "observation generation"
             data.generate_observations(self.depth_source)
-            errors["stage"] = "metadata update"
-            data.meta.update(self.metadata)
+            if self.metadata:
+                errors["stage"] = "metadata update"
+                data.meta.update(self.metadata)
             errors["stage"] = "output writing"
             self.writer.write(data, outfile)
         except:

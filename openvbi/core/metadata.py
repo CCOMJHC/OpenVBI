@@ -249,6 +249,7 @@ class Metadata:
         if 'processing' not in self.meta['properties']:
             self.meta['properties']['processing'] = list()
         self.meta['properties']['processing'].append(element)
+        self.meta['properties']['platform']['dataProcessed'] = True
 
     def render(self, filename: Union[Path,str]) -> None:
         metadata = copy.deepcopy(self.meta)
@@ -277,6 +278,10 @@ class Metadata:
             return valid, None
         else:
             return valid, result['errors']
+        
+    def valid(self) -> bool:
+        rc, _ = self.validate()
+        return rc
 
     def adopt(self, metadata: Dict[str,Any]) -> None:
         if 'type' not in metadata or 'crs' not in metadata or 'properties' not in metadata:
@@ -289,6 +294,8 @@ class Metadata:
 
     def update(self, updates: Dict[str,Any]) -> None:
         deepmerge.always_merger.merge(self.meta, updates)
+        print("**** VALIDATING METADATA AFTER UPDATE WITH METADATA:")
+        self.inspect()
         result, error = self.validate()
         if not result:
             print(error)
