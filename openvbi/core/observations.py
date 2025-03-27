@@ -23,15 +23,19 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List, Tuple
+from typing import List, Tuple, Any
 import datetime
 from dataclasses import dataclass
+
 import pandas
 import geopandas
+
 from marulc import NMEA0183Parser, NMEA2000Parser
 from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
+
 import bitstruct
+
 from openvbi.core.types import TimeSource, RawObs, NoDepths
 from openvbi.core.statistics import PktStats
 from openvbi.core.interpolation import InterpTable
@@ -40,10 +44,245 @@ import openvbi.core.metadata as md
 from openvbi import version
 from openvbi.adaptors.logger_file import DataPacket
 
+
+DEPENDENT_VARS = {'Depth': 'z',
+                  'WindSpeed': 'windSpeed',
+                  'WindAngle': 'windAngle'}
+
+
 class BadData(Exception):
     pass
 
 class RawN0183Obs(RawObs):
+    # TODO: Add support for wind data:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L1361C9-L1422C11
+    # "MWD": {
+    #     "Fields": [
+    #         {
+    #             "Id": "direction_true",
+    #             "Description": "Wind direction true"
+    #         },
+    #         {
+    #             "Id": "true",
+    #             "Description": "True"
+    #         },
+    #         {
+    #             "Id": "direction_magnetic",
+    #             "Description": "Wind direction magnetic"
+    #         },
+    #         {
+    #             "Id": "magnetic",
+    #             "Description": "Magnetic"
+    #         },
+    #         {
+    #             "Id": "wind_speed_knots",
+    #             "Description": "Wind speed knots"
+    #         },
+    #         {
+    #             "Id": "knots",
+    #             "Description": "Knots"
+    #         },
+    #         {
+    #             "Id": "wind_speed_meters",
+    #             "Description": "Wind speed meters/second"
+    #         },
+    #         {
+    #             "Id": "meters",
+    #             "Description": "Wind speed"
+    #         }
+    #     ],
+    #     "Description": "Wind Direction\n    NMEA 0183 standard Wind Direction and Speed, with respect to north."
+    # },
+    # "MWV": {
+    #     "Fields": [
+    #         {
+    #             "Id": "wind_angle",
+    #             "Description": "Wind angle"
+    #         },
+    #         {
+    #             "Id": "reference",
+    #             "Description": "Reference"
+    #         },
+    #         {
+    #             "Id": "wind_speed",
+    #             "Description": "Wind speed"
+    #         },
+    #         {
+    #             "Id": "wind_speed_units",
+    #             "Description": "Wind speed units"
+    #         },
+    #         {
+    #             "Id": "status",
+    #             "Description": "Status"
+    #         }
+    #     ],
+    #     "Description": "Wind Speed and Angle\n    NMEA 0183 standard Wind Speed and Angle, in relation to the vessel's\n    bow/centerline."
+    # },
+    # Also need heading and speed through water to go from apparent to magnetic/true wind direction:
+    # Speed/Heading:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L1478C9-L1514C11
+    # "VHW": {
+    #     "Fields": [
+    #         {
+    #             "Id": "heading_true",
+    #             "Description": "Heading true degrees"
+    #         },
+    #         {
+    #             "Id": "true",
+    #             "Description": "heading true"
+    #         },
+    #         {
+    #             "Id": "heading_magnetic",
+    #             "Description": "Heading Magnetic degrees"
+    #         },
+    #         {
+    #             "Id": "magnetic",
+    #             "Description": "Magnetic"
+    #         },
+    #         {
+    #             "Id": "water_speed_knots",
+    #             "Description": "Water speed knots"
+    #         },
+    #         {
+    #             "Id": "knots",
+    #             "Description": "Knots"
+    #         },
+    #         {
+    #             "Id": "water_speed_km",
+    #             "Description": "Water speed kilometers"
+    #         },
+    #         {
+    #             "Id": "kilometers",
+    #             "Description": "Kilometers"
+    #         }
+    #     ],
+    #     "Description": "Water Speed and Heading"
+    # },
+    # TODO: Add speed over ground
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L857C9-L905C11
+    # "RMA": {
+    #     "Fields": [
+    #         {
+    #             "Id": "data_status",
+    #             "Description": "Data status"
+    #         },
+    #         {
+    #             "Id": "lat",
+    #             "Description": "Latitude"
+    #         },
+    #         {
+    #             "Id": "lat_dir",
+    #             "Description": "Latitude Direction"
+    #         },
+    #         {
+    #             "Id": "lon",
+    #             "Description": "Longitude"
+    #         },
+    #         {
+    #             "Id": "lon_dir",
+    #             "Description": "Longitude Direction"
+    #         },
+    #         {
+    #             "Id": "not_used_1",
+    #             "Description": "Not Used 1"
+    #         },
+    #         {
+    #             "Id": "not_used_2",
+    #             "Description": "Not Used 2"
+    #         },
+    #         {
+    #             "Id": "spd_over_grnd",
+    #             "Description": "Speed over ground"
+    #         },
+    #         {
+    #             "Id": "crse_over_grnd",
+    #             "Description": "Course over ground"
+    #         },
+    #         {
+    #             "Id": "variation",
+    #             "Description": "Variation"
+    #         },
+    #         {
+    #             "Id": "var_dir",
+    #             "Description": "Variation Direction"
+    #         }
+    #     ],
+    #     "Description": ""
+    # },
+    # Also for SOG:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L963C9-L1019C11
+    # "RMC": {
+    #     "Fields": [
+    #         {
+    #             "Id": "timestamp",
+    #             "Description": "Timestamp"
+    #         },
+    #         {
+    #             "Id": "status",
+    #             "Description": "Status"
+    #         },
+    #         {
+    #             "Id": "lat",
+    #             "Description": "Latitude"
+    #         },
+    #         {
+    #             "Id": "lat_dir",
+    #             "Description": "Latitude Direction"
+    #         },
+    #         {
+    #             "Id": "lon",
+    #             "Description": "Longitude"
+    #         },
+    #         {
+    #             "Id": "lon_dir",
+    #             "Description": "Longitude Direction"
+    #         },
+    #         {
+    #             "Id": "spd_over_grnd",
+    #             "Description": "Speed Over Ground"
+    #         },
+    #         {
+    #             "Id": "true_course",
+    #             "Description": "True Course"
+    #         },
+    #         {
+    #             "Id": "datestamp",
+    #             "Description": "Datestamp"
+    #         },
+    #         {
+    #             "Id": "mag_variation",
+    #             "Description": "Magnetic Variation"
+    #         },
+    #         {
+    #             "Id": "mag_var_dir",
+    #             "Description": "Magnetic Variation Direction"
+    #         },
+    #         {
+    #             "Id": "mode_indicator",
+    #             "Description": "Mode Indicator"
+    #         },
+    #         {
+    #             "Id": "nav_status",
+    #             "Description": "Navigational Status"
+    #         }
+    #     ],
+    #     "Description": "Recommended Minimum Specific GPS/TRANSIT Data"
+    # },
+    # TODO: Add support for temperature data
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L1465C9-L1477C11
+    # "MTW": {
+    #     "Fields": [
+    #         {
+    #             "Id": "temperature",
+    #             "Description": "Water temperature"
+    #         },
+    #         {
+    #             "Id": "units",
+    #             "Description": "Unit of measurement"
+    #         }
+    #     ],
+    #     "Description": "Water Temperature"
+    # },
     def __init__(self, elapsed: int, message: str) -> None:
         parser = NMEA0183Parser()
         try:
@@ -94,8 +333,544 @@ class RawN0183Obs(RawObs):
         if self._data['Fields']['lat_dir'] == 'S':
             lat = - lat
         return (lon, lat)
-    
+
+    def GetField(self, field_name: str) -> Any | None:
+        try:
+            return self._data['Fields'][field_name]
+        except KeyError:
+            return None
+
 class RawN2000Obs(RawObs):
+    # TODO: Add support for wind data:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L19739C7-L19799C31
+    # {
+    #     "PGN": 130306,
+    #     "Id": "windData",
+    #     "Description": "Wind Data",
+    #     "Type": "Single",
+    #     "Complete": true,
+    #     "Length": 8,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 2,
+    #             "Id": "windSpeed",
+    #             "Name": "Wind Speed",
+    #             "BitLength": 16,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 3,
+    #             "Id": "windAngle",
+    #             "Name": "Wind Angle",
+    #             "BitLength": 16,
+    #             "BitOffset": 24,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 4,
+    #             "Id": "reference",
+    #             "Name": "Reference",
+    #             "BitLength": 3,
+    #             "BitOffset": 40,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "True (ground referenced to North)", "value": "0"},
+    #                 {"name": "Magnetic (ground referenced to Magnetic North)", "value": "1"},
+    #                 {"name": "Apparent", "value": "2"},
+    #                 {"name": "True (boat referenced)", "value": "3"},
+    #                 {"name": "True (water referenced)", "value": "4"}]},
+    #         {
+    #             "Order": 5,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "BitLength": 21,
+    #             "BitOffset": 43,
+    #             "BitStart": 3,
+    #             "Type": "Binary data",
+    #             "Signed": false}]},
+    # Also need heading and speed through water to go from apparent to magnetic/true wind direction:
+    # Heading:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L8461C7-L8531C31
+    # {
+    #     "PGN": 127250,
+    #     "Id": "vesselHeading",
+    #     "Description": "Vessel Heading",
+    #     "Type": "Single",
+    #     "Complete": true,
+    #     "Length": 8,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 2,
+    #             "Id": "heading",
+    #             "Name": "Heading",
+    #             "BitLength": 16,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 3,
+    #             "Id": "deviation",
+    #             "Name": "Deviation",
+    #             "BitLength": 16,
+    #             "BitOffset": 24,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": true},
+    #         {
+    #             "Order": 4,
+    #             "Id": "variation",
+    #             "Name": "Variation",
+    #             "BitLength": 16,
+    #             "BitOffset": 40,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": true},
+    #         {
+    #             "Order": 5,
+    #             "Id": "reference",
+    #             "Name": "Reference",
+    #             "BitLength": 2,
+    #             "BitOffset": 56,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "True", "value": "0"},
+    #                 {"name": "Magnetic", "value": "1"},
+    #                 {"name": "Error", "value": "2"},
+    #                 {"name": "Null", "value": "3"}]},
+    #         {
+    #             "Order": 6,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "Description": "Reserved",
+    #             "BitLength": 6,
+    #             "BitOffset": 58,
+    #             "BitStart": 2,
+    #             "Type": "Binary data",
+    #             "Signed": false}]},
+    # Speed through water (while we're at it, get speed over ground):
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L22404C7-L22524C31
+    # {
+    #     "PGN": 130577,
+    #     "Id": "directionData",
+    #     "Description": "Direction Data",
+    #     "Type": "Fast",
+    #     "Complete": false,
+    #     "Missing": [
+    #         "Fields",
+    #         "FieldLengths",
+    #         "Precision",
+    #         "SampleData"],
+    #     "Length": 14,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "dataMode",
+    #             "Name": "Data Mode",
+    #             "BitLength": 4,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "Autonomous", "value": "0"},
+    #                 {"name": "Differential enhanced", "value": "1"},
+    #                 {"name": "Estimated", "value": "2"},
+    #                 {"name": "Simulator", "value": "3"},
+    #                 {"name": "Manual", "value": "4"}]},
+    #         {
+    #             "Order": 2,
+    #             "Id": "cogReference",
+    #             "Name": "COG Reference",
+    #             "BitLength": 2,
+    #             "BitOffset": 4,
+    #             "BitStart": 4,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "True", "value": "0"},
+    #                 {"name": "Magnetic", "value": "1"},
+    #                 {"name": "Error", "value": "2"},
+    #                 {"name": "Null", "value": "3"}]},
+    #         {
+    #             "Order": 3,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "Description": "Reserved",
+    #             "BitLength": 2,
+    #             "BitOffset": 6,
+    #             "BitStart": 6,
+    #             "Type": "Binary data",
+    #             "Signed": false},
+    #         {
+    #             "Order": 4,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 5,
+    #             "Id": "cog",
+    #             "Name": "COG",
+    #             "BitLength": 16,
+    #             "BitOffset": 16,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 6,
+    #             "Id": "sog",
+    #             "Name": "SOG",
+    #             "BitLength": 16,
+    #             "BitOffset": 32,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 7,
+    #             "Id": "heading",
+    #             "Name": "Heading",
+    #             "BitLength": 16,
+    #             "BitOffset": 48,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 8,
+    #             "Id": "speedThroughWater",
+    #             "Name": "Speed through Water",
+    #             "BitLength": 16,
+    #             "BitOffset": 64,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 9,
+    #             "Id": "set",
+    #             "Name": "Set",
+    #             "BitLength": 16,
+    #             "BitOffset": 80,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 10,
+    #             "Id": "drift",
+    #             "Name": "Drift",
+    #             "BitLength": 16,
+    #             "BitOffset": 96,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false}]},
+    # TODO: Add speed over ground
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L12108C7-L12178C31
+    # {
+    #     "PGN": 129026,
+    #     "Id": "cogSogRapidUpdate",
+    #     "Description": "COG & SOG, Rapid Update",
+    #     "Type": "Single",
+    #     "Complete": true,
+    #     "Length": 8,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 2,
+    #             "Id": "cogReference",
+    #             "Name": "COG Reference",
+    #             "BitLength": 2,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "True", "value": "0"},
+    #                 {"name": "Magnetic", "value": "1"},
+    #                 {"name": "Error", "value": "2"},
+    #                 {"name": "Null", "value": "3"}]},
+    #         {
+    #             "Order": 3,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "Description": "Reserved",
+    #             "BitLength": 6,
+    #             "BitOffset": 10,
+    #             "BitStart": 2,
+    #             "Type": "Binary data",
+    #             "Signed": false},
+    #         {
+    #             "Order": 4,
+    #             "Id": "cog",
+    #             "Name": "COG",
+    #             "BitLength": 16,
+    #             "BitOffset": 16,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 5,
+    #             "Id": "sog",
+    #             "Name": "SOG",
+    #             "BitLength": 16,
+    #             "BitOffset": 32,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 6,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "Description": "Reserved",
+    #             "BitLength": 16,
+    #             "BitOffset": 48,
+    #             "BitStart": 0,
+    #             "Type": "Binary data",
+    #             "Signed": false}]},
+    # Also for SOG:
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L22404C7-L22524C31
+    # {
+    #     "PGN": 130577,
+    #     "Id": "directionData",
+    #     "Description": "Direction Data",
+    #     "Type": "Fast",
+    #     "Complete": false,
+    #     "Missing": [
+    #         "Fields",
+    #         "FieldLengths",
+    #         "Precision",
+    #         "SampleData"],
+    #     "Length": 14,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "dataMode",
+    #             "Name": "Data Mode",
+    #             "BitLength": 4,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "Autonomous", "value": "0"},
+    #                 {"name": "Differential enhanced", "value": "1"},
+    #                 {"name": "Estimated", "value": "2"},
+    #                 {"name": "Simulator", "value": "3"},
+    #                 {"name": "Manual", "value": "4"}]},
+    #         {
+    #             "Order": 2,
+    #             "Id": "cogReference",
+    #             "Name": "COG Reference",
+    #             "BitLength": 2,
+    #             "BitOffset": 4,
+    #             "BitStart": 4,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "True", "value": "0"},
+    #                 {"name": "Magnetic", "value": "1"},
+    #                 {"name": "Error", "value": "2"},
+    #                 {"name": "Null", "value": "3"}]},
+    #         {
+    #             "Order": 3,
+    #             "Id": "reserved",
+    #             "Name": "Reserved",
+    #             "Description": "Reserved",
+    #             "BitLength": 2,
+    #             "BitOffset": 6,
+    #             "BitStart": 6,
+    #             "Type": "Binary data",
+    #             "Signed": false},
+    #         {
+    #             "Order": 4,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 5,
+    #             "Id": "cog",
+    #             "Name": "COG",
+    #             "BitLength": 16,
+    #             "BitOffset": 16,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 6,
+    #             "Id": "sog",
+    #             "Name": "SOG",
+    #             "BitLength": 16,
+    #             "BitOffset": 32,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 7,
+    #             "Id": "heading",
+    #             "Name": "Heading",
+    #             "BitLength": 16,
+    #             "BitOffset": 48,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 8,
+    #             "Id": "speedThroughWater",
+    #             "Name": "Speed through Water",
+    #             "BitLength": 16,
+    #             "BitOffset": 64,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false},
+    #         {
+    #             "Order": 9,
+    #             "Id": "set",
+    #             "Name": "Set",
+    #             "BitLength": 16,
+    #             "BitOffset": 80,
+    #             "BitStart": 0,
+    #             "Units": "rad",
+    #             "Resolution": "0.0001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 10,
+    #             "Id": "drift",
+    #             "Name": "Drift",
+    #             "BitLength": 16,
+    #             "BitOffset": 96,
+    #             "BitStart": 0,
+    #             "Units": "m/s",
+    #             "Resolution": "0.01",
+    #             "Signed": false}]},
+    # TODO: Add support for temperature data
+    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L20174C7-L20245C31
+    # {
+    #     "PGN": 130316,
+    #     "Id": "temperatureExtendedRange",
+    #     "Description": "Temperature Extended Range",
+    #     "Type": "Single",
+    #     "Complete": true,
+    #     "Length": 8,
+    #     "RepeatingFields": 0,
+    #     "Fields": [
+    #         {
+    #             "Order": 1,
+    #             "Id": "sid",
+    #             "Name": "SID",
+    #             "BitLength": 8,
+    #             "BitOffset": 0,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 2,
+    #             "Id": "instance",
+    #             "Name": "Instance",
+    #             "BitLength": 8,
+    #             "BitOffset": 8,
+    #             "BitStart": 0,
+    #             "Signed": false},
+    #         {
+    #             "Order": 3,
+    #             "Id": "source",
+    #             "Name": "Source",
+    #             "BitLength": 8,
+    #             "BitOffset": 16,
+    #             "BitStart": 0,
+    #             "Type": "Lookup table",
+    #             "Signed": false,
+    #             "EnumValues": [
+    #                 {"name": "Sea Temperature", "value": "0"},
+    #                 {"name": "Outside Temperature", "value": "1"},
+    #                 {"name": "Inside Temperature", "value": "2"},
+    #                 {"name": "Engine Room Temperature", "value": "3"},
+    #                 {"name": "Main Cabin Temperature", "value": "4"},
+    #                 {"name": "Live Well Temperature", "value": "5"},
+    #                 {"name": "Bait Well Temperature", "value": "6"},
+    #                 {"name": "Refridgeration Temperature", "value": "7"},
+    #                 {"name": "Heating System Temperature", "value": "8"},
+    #                 {"name": "Dew Point Temperature", "value": "9"},
+    #                 {"name": "Apparent Wind Chill Temperature", "value": "10"},
+    #                 {"name": "Theoretical Wind Chill Temperature", "value": "11"},
+    #                 {"name": "Heat Index Temperature", "value": "12"},
+    #                 {"name": "Freezer Temperature", "value": "13"},
+    #                 {"name": "Exhaust Gas Temperature", "value": "14"}]},
+    #         {
+    #             "Order": 4,
+    #             "Id": "temperature",
+    #             "Name": "Temperature",
+    #             "BitLength": 24,
+    #             "BitOffset": 24,
+    #             "BitStart": 0,
+    #             "Units": "K",
+    #             "Type": "Temperature (hires)",
+    #             "Resolution": "0.001",
+    #             "Signed": false},
+    #         {
+    #             "Order": 5,
+    #             "Id": "setTemperature",
+    #             "Name": "Set Temperature",
+    #             "BitLength": 16,
+    #             "BitOffset": 48,
+    #             "BitStart": 0,
+    #             "Units": "K",
+    #             "Type": "Temperature",
+    #             "Resolution": "0.1",
+    #             "Signed": false}]},
     def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
         parser = NMEA2000Parser()
         has_time = False
@@ -170,6 +945,11 @@ class RawN2000Obs(RawObs):
             case _:
                 raise BadData()
 
+    def GetField(self, field_name: str) -> Any | None:
+        try:
+            return self._data['Fields'][field_name]
+        except KeyError:
+            return None
 
 class ParsedN2000(RawObs):
     def __init__(self, elapsed: int, data: DataPacket) -> None:
@@ -281,30 +1061,75 @@ class Dataset:
         self.timesrc = determine_time_source(self.stats)
         self.timebase = generate_timebase(self.packets, self.timesrc)
     
-    def generate_observations(self, depth: str) -> None:
-        depth_table = InterpTable(['z',])
+    # def generate_observations(self, vars: list[str]) -> None:
+        # dep_var_table: dict[str, InterpTable] = {}
+        # for var in vars:
+        #     if var not in DEPENDENT_VARS.keys():
+        #         raise ValueError(f"Unknown dependent variable {var}")
+        #     dep_var_table[var] = InterpTable([DEPENDENT_VARS[var]])
+        #
+        # position_table = InterpTable(['lon', 'lat'])
+        #
+        # for obs in self.packets:
+        #     if obs.Elapsed() is None:
+        #         continue
+        #     obs_name = obs.Name()
+        #     if obs_name in vars:
+        #         dep_var_table[obs_name].add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], obs.Depth())
+        #     elif obs_name in ['GGA','GNSS']:
+        #         position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+        #     elif obs_name == 'Position, Rapid Update':
+        #         position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+        #
+        # # ind_timepoints: list[np.ndarray] = []
+        # any_timepoints: bool = False
+        # for k, v in dep_var_table:
+        #     var_timepoints = v.ind()
+        #     if len(var_timepoints) > 0:
+        #         any_timepoints = True
+        #     else:
+        #         # No time points for this var, continue processing next var
+        #         continue
+        #     # ind_timepoints.append(pts)
+        #     var = v.var(DEPENDENT_VARS[k])
+        #     var_times = self.timebase.interpolate(['ref',], var_timepoints)[0]
+        #     var_lat, var_lon = position_table.interpolate(['lat', 'lon'], var_timepoints)
+        #
+        # if not any_timepoints:
+        #     raise NoDepVars()
+
+    def generate_observations(self, obs_vars: list[str]) -> None:
+        vars = []
+        for ov in obs_vars:
+            if ov not in DEPENDENT_VARS.keys():
+                raise ValueError(f"Unknown observation variable {ov}")
+            vars.append(DEPENDENT_VARS[ov])
+        dep_var_table = InterpTable(vars)
         position_table = InterpTable(['lon', 'lat'])
 
         for obs in self.packets:
             if obs.Elapsed() is None:
                 continue
+            obs_name = obs.Name()
+            if obs_name in obs_vars:
+                match obs_name:
+                    case 'Depth':
+                        val = obs.Depth()
+                dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
+            elif obs_name in ['GGA', 'GNSS']:
+                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+            elif obs_name == 'Position, Rapid Update':
+                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
 
-            if obs.Name() == depth:
-                depth_table.add_point(obs.Elapsed(), 'z', obs.Depth())
-            elif obs.Name() in ['GGA','GNSS']:
-                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-            elif obs.Name() == 'Position, Rapid Update':
-                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-        
-        depth_timepoints = depth_table.ind()
-        if len(depth_timepoints) == 0:
+        dep_var_timepoints = dep_var_table.ind()
+        if len(dep_var_timepoints) == 0:
             raise NoDepths()
-        z = depth_table.var('z')
-        z_times = self.timebase.interpolate(['ref',], depth_timepoints)[0]
-        z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)
+        z = dep_var_table.var('z')
+        z_times = self.timebase.interpolate(['ref', ], dep_var_timepoints)[0]
+        z_lat, z_lon = position_table.interpolate(['lat', 'lon'], dep_var_timepoints)
         
         data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
-        for n in range(depth_table.n_points()):
+        for n in range(dep_var_table.n_points()):
             data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], [-1.0, -1.0, -1.0]]
 
         self.depths = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
