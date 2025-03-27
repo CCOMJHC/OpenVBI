@@ -294,8 +294,6 @@ class Metadata:
 
     def update(self, updates: Dict[str,Any]) -> None:
         deepmerge.always_merger.merge(self.meta, updates)
-        print("**** VALIDATING METADATA AFTER UPDATE WITH METADATA:")
-        self.inspect()
         result, error = self.validate()
         if not result:
             print(error)

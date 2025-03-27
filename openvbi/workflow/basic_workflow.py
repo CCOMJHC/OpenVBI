@@ -28,12 +28,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Tuple
+from typing import Tuple, Callable, Dict
 import copy
 from pathlib import Path
 from openvbi.adaptors import Loader, Writer
 from openvbi.core.observations import Dataset
-from openvbi.workflow import Workflow
+from openvbi.workflow import Workflow, WorkflowEvent
 from openvbi.core.metadata import Metadata
 
 class BasicWorkflow(Workflow):
@@ -52,17 +52,25 @@ class BasicWorkflow(Workflow):
     def outsuffix(self):
         return self.writer.suffix()
 
-    def process_file(self, infile: str | Path, outfile: str | Path) -> Tuple[bool,dict]:
+    def process_file(self, infile: str | Path, outfile: str | Path, callback: Callable[[WorkflowEvent,Dict],None]) -> Tuple[bool,dict]:
         errors = {"filename": infile, "stage": ""}
         try:
             errors["stage"] = "loader"
+            if callback:
+                callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
             data: Dataset = self.loader.load(infile)
             errors["stage"] = "observation generation"
+            if callback:
+                callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
             data.generate_observations(self.depth_source)
             if self.metadata:
                 errors["stage"] = "metadata update"
+                if callback:
+                    callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
                 data.meta.update(self.metadata)
             errors["stage"] = "output writing"
+            if callback:
+                callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
             self.writer.write(data, outfile)
         except:
             return False, errors
