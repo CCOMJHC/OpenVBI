@@ -26,6 +26,7 @@
 from typing import List, Tuple, Any
 import datetime
 from dataclasses import dataclass
+from collections import namedtuple
 
 import pandas
 import geopandas
@@ -334,11 +335,6 @@ class RawN0183Obs(RawObs):
             lat = - lat
         return (lon, lat)
 
-    def GetField(self, field_name: str) -> Any | None:
-        try:
-            return self._data['Fields'][field_name]
-        except KeyError:
-            return None
 
 class RawN2000Obs(RawObs):
     # TODO: Add support for wind data:
@@ -899,6 +895,8 @@ class RawN2000Obs(RawObs):
             name = 'COG'
         elif pgn == 129029:
             name = 'GNSS'
+        elif pgn == 130577:
+            name = 'DirectionData'
         else:
             # Attempt to get the PGN name from the MARULC database.  We could do this for
             # all PGNs, but the names above are for data that we use everywhere, and we
@@ -936,6 +934,11 @@ class RawN2000Obs(RawObs):
             raise BadData()
         return self._data['Fields']['depth']
 
+    # DirectionData = namedtuple('DirectionData',
+    #                            ['cog', 'cogReference', 'dataMode', 'drive', 'heading'])
+
+    # def Direction(self) ->:
+
     def Position(self) -> Tuple[float,float]:
         match self.Name():
             case 'GNSS' | 'Position, Rapid Update':
@@ -945,11 +948,6 @@ class RawN2000Obs(RawObs):
             case _:
                 raise BadData()
 
-    def GetField(self, field_name: str) -> Any | None:
-        try:
-            return self._data['Fields'][field_name]
-        except KeyError:
-            return None
 
 class ParsedN2000(RawObs):
     def __init__(self, elapsed: int, data: DataPacket) -> None:

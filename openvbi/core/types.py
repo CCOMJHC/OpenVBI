@@ -25,7 +25,7 @@
 
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, Any
 
 ## Encapsulate the types of real-world time information that can be used
 #

@@ -43,7 +43,7 @@ def test_basic_processing(data_path, temp_path):
     data.meta.setVesselID(md.VesselIdentifier.MMSI, "000000000")
 
     # YachtDevices is a NMEA2000 device, so we convert 'Depth' messages for depth information
-    data.generate_observations('Depth')
+    data.generate_observations(['Depth'])
 
     gjson_path = temp_path / '00030095.json'
     writer = GeoJSONWriter()

@@ -25,6 +25,7 @@
 import lzma
 import struct
 from typing import Tuple
+from pathlib import Path
 
 from marulc.nmea2000 import get_description_for_pgn
 from marulc.exceptions import ParseError
@@ -104,7 +105,7 @@ class YDVRLoader(Loader):
     def suffix(self) -> str:
         return '.DAT'
     
-    def load(self, filename: str) -> Dataset:
+    def load(self, filename: str | Path) -> Dataset:
         """
         Load YDVR data from ``filename``.
         :param filename:
