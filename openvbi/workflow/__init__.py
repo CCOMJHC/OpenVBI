@@ -30,6 +30,7 @@
 
 from typing import Protocol, Tuple, List, Dict
 from pathlib import Path
+from openvbi.cache import Cache
 
 class Workflow(Protocol):
     def insuffix(self) -> str:
@@ -56,3 +57,8 @@ def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workfl
                 rc = False
                 errors.append(err)
     return rc, processed, errors
+
+# update a specified cache with arguments before performing a workflow
+def apply_worflow_with_cache(cache: Cache, outputdir: str | Path, workflow: Workflow, **kwargs) -> Tuple[bool, List[str], List[Dict]]:
+    cache.update(kwargs)
+    apply_workflow(cache.dir, outputdir, workflow)
