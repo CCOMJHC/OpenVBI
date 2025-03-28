@@ -59,6 +59,6 @@ def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workfl
     return rc, processed, errors
 
 # update a specified cache with arguments before performing a workflow
-def apply_worflow_with_cache(cache: Cache, outputdir: str | Path, workflow: Workflow, **kwargs) -> Tuple[bool, List[str], List[Dict]]:
+def apply_workflow_with_cache(cache: Cache, outputdir: str | Path, workflow: Workflow, **kwargs) -> Tuple[bool, List[str], List[Dict]]:
     cache.update(kwargs)
-    apply_workflow(cache.dir, outputdir, workflow)
+    return apply_workflow(cache.dir, outputdir, workflow)
