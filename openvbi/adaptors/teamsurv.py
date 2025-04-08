@@ -23,15 +23,21 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from pathlib import Path
+
 from openvbi.core.observations import RawN0183Obs, BadData, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
 from openvbi.adaptors import Loader
 
+
+LOADER_SUFFIX: str = '.TSV'
+
+
 class TeamSurvLoader(Loader):
     def suffix(self) -> str:
-        return '.TSV'
+        return LOADER_SUFFIX
     
-    def load(self, filename: str) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         rtn: Dataset = Dataset()
 
         with open(filename) as f:

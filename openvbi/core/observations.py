@@ -23,10 +23,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List, Tuple, Any
+from typing import List, Tuple
 import datetime
 from dataclasses import dataclass
-from collections import namedtuple
 
 import pandas
 import geopandas

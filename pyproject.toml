@@ -21,6 +21,9 @@ classifiers = [
 "Homepage" = "https://github.com/CCOMJHC/OpenVBI"
 "Bug Tracker" = "https://github.com/CCOMJHC/OpenVBI/issues"
 
+[project.scripts]
+vbi = "openvbi.command:cli"
+
 [tool.setuptools.dynamic]
 version = {attr = "openvbi.__version__"}
 dependencies = {file = ["requirements.txt"]}

@@ -35,6 +35,10 @@ from openvbi.core.statistics import PktFaults
 from openvbi.core.timebase import determine_time_source, generate_timebase
 from openvbi.adaptors import Loader
 
+
+LOADER_SUFFIX: str = '.DAT'
+
+
 def TranslateCANId(id: int) -> Tuple[int, int, int, int]:
     pf = (id >> 16) & 0xFF
     ps = (id >> 8) & 0xFF
@@ -99,20 +103,19 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
     return elapsed, pgn, packet
 
 class YDVRLoader(Loader):
-    def __init__(self, compressed=False) -> None:
-        self.compressed = compressed
-
     def suffix(self) -> str:
-        return '.DAT'
+        return LOADER_SUFFIX
     
-    def load(self, filename: str | Path) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         """
         Load YDVR data from ``filename``.
         :param filename:
         :param compressed: If true, attempt to open ``filename`` as a lzma-compressed file.
         :return:
         """
-        if self.compressed:
+        if not 'compressed' in kwargs:
+            fopen = open
+        elif kwargs['compressed']:
             fopen = lzma.open
         else:
             fopen = open

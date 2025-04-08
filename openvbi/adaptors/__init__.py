@@ -27,14 +27,18 @@ from typing import Protocol
 from pathlib import Path
 from openvbi.core.observations import Dataset
 
+
 class Loader(Protocol):
     def suffix(self) -> str:
         pass
-    def load(self, filename: str | Path) -> Dataset:
+
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         pass
+
 
 class Writer(Protocol):
     def suffix(self) -> str:
         pass
+
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
         pass
