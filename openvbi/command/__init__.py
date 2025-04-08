@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import traceback
 
 import click
 
@@ -13,7 +14,7 @@ def cli():
 
 @click.command()
 @click.argument('input_file', type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path))
-@click.argument('output', type=click.File('w'))
+@click.argument('output', type=click.File(mode='w', encoding='ascii'))
 def dump(input_file: Path, output):
     """
     Dump logger data file to ASCII format for debugging.
@@ -30,7 +31,9 @@ def dump(input_file: Path, output):
             output.write(f"Packet {i}: name: {p.Name()}\n")
             if hasattr(p, '_data'):
                 output.write(f"\t_data: {p._data}\n")
+            else:
+                output.write(f"\tNo _data in packet.\n")
     except Exception as e:
-        sys.exit(str(e))
+        sys.exit(traceback.format_exc())
 
 cli.add_command(dump)

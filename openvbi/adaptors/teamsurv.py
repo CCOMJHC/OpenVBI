@@ -36,11 +36,11 @@ LOADER_SUFFIX: str = '.TSV'
 class TeamSurvLoader(Loader):
     def suffix(self) -> str:
         return LOADER_SUFFIX
-    
+
     def load(self, filename: str | Path, **kwargs) -> Dataset:
         rtn: Dataset = Dataset()
 
-        with open(filename) as f:
+        with open(filename, encoding='windows-1252') as f:
             for message in f:
                 try:
                     obs = RawN0183Obs(None, message)

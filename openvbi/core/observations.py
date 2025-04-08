@@ -309,9 +309,18 @@ class RawN0183Obs(RawObs):
     def Timestamp(self) -> float:
         if not self.HasTime():
             return -1.0
-        base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
-        time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
-        reftime = base_date + time_offset
+
+        match self.Name():
+            case 'ZDA':
+                base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
+                time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
+            case 'RMC':
+                base_date = datetime.datetime.strptime(str(self._data['Fields']['datestamp']), '%d%m%y')
+                time_offset = datetime.datetime.strptime(str(self._data['Fields']['timestamp']), '%H%M%S') - datetime.datetime(1900, 1, 1)
+            case _:
+                raise ValueError(f"Unable to parse timestamp for NMEA0183 message of name {self.Name()}")
+
+        reftime = (base_date + time_offset).astimezone(tz=datetime.timezone.utc)
         return reftime.timestamp()
     
     def Depth(self) -> float:
@@ -932,11 +941,6 @@ class RawN2000Obs(RawObs):
         if self.Name() != 'Depth':
             raise BadData()
         return self._data['Fields']['depth']
-
-    # DirectionData = namedtuple('DirectionData',
-    #                            ['cog', 'cogReference', 'dataMode', 'drive', 'heading'])
-
-    # def Direction(self) ->:
 
     def Position(self) -> Tuple[float,float]:
         match self.Name():
