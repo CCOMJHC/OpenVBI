@@ -31,7 +31,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import List
+from collections.abc import Collection
 
 import numpy as np
 
@@ -58,8 +58,8 @@ class InterpTable:
     # This sets up for interpolation of an independent variable (added automatically) against
     # the named dependent variables.
     #
-    # \param vars   (List[str]) List of the names of the dependent variables to manage
-    def __init__(self, vars: List[str]) -> None:
+    # \param vars   (Collection[str]) list|tuple|etc. of the names of the dependent variables to manage
+    def __init__(self, vars: Collection[str]) -> None:
         # Add an independent variable tag implicitly to the lookup table
         self.vars = {}
         self.vars['ind'] = []
@@ -93,9 +93,9 @@ class InterpTable:
     # really useful if you're updating all of the variables.
     #
     # \param ind    Independent variable value to add to the array
-    # \param vars   List of names of the dependent variables to update
-    # \param values List of values to update for the named dependent variables, in the same order
-    def add_points(self, ind: float, vars: List[str], values: List[float]) -> None:
+    # \param vars   Collection list|tuple|etc. of names of the dependent variables to update
+    # \param values Collection list|tuple|etc. of values to update for the named dependent variables, in the same order
+    def add_points(self, ind: float, vars: Collection[str], values: Collection[float]) -> None:
         for var in vars:
             if var not in self.vars:
                 raise NoSuchVariable()
@@ -110,10 +110,10 @@ class InterpTable:
     # Construct a linear interpolation of the named dependent variables at the given array
     # of independent variable values.
     #
-    # \param yvars  List of names of the dependent variables to interpolate
+    # \param yvars  Collection list|tuple|etc. of names of the dependent variables to interpolate
     # \param x      NumPy array of the independent variable points at which to interpolate
     # \return List of NumPy arrays for the named dependent variables, in the same order
-    def interpolate(self, yvars: List[str], x: np.ndarray) -> List[np.ndarray]:
+    def interpolate(self, yvars: Collection[str], x: np.ndarray) -> list[np.ndarray]:
         for yvar in yvars:
             if yvar not in self.vars:
                 raise NoSuchVariable()

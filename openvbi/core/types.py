@@ -81,5 +81,13 @@ class RawObs(ABC):
     def Position(self) -> Tuple[float,float]:
         pass
 
+    @abstractmethod
+    def WaterTemperature(self) -> float:
+        """
+        Water temperature in degrees Kelvin
+        :return:
+        """
+        pass
+
 class NoDepths(RuntimeError):
     pass

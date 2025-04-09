@@ -23,6 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections.abc import Collection
 from typing import List, Tuple
 import datetime
 from dataclasses import dataclass
@@ -41,13 +42,17 @@ from openvbi.core.statistics import PktStats
 from openvbi.core.interpolation import InterpTable
 from openvbi.core.timebase import determine_time_source, generate_timebase
 import openvbi.core.metadata as md
+import openvbi.core.unit_conversion as uc
 from openvbi import version
 from openvbi.adaptors.logger_file import DataPacket
 
 
-DEPENDENT_VARS = {'Depth': 'z',
-                  'WindSpeed': 'windSpeed',
-                  'WindAngle': 'windAngle'}
+DEPENDENT_VARS = {'Depth': 'z',                     # NMEA2000
+                  'DPT': 'z',                       # NMEA0183
+                  'DBT': 'z',                       # NMEA0183
+                  'WaterTemperature': 'waterTemp',  # NMEA2000
+                  'MTW': 'waterTemp'                # NMEA0183
+                 }
 
 
 class BadData(Exception):
@@ -342,6 +347,13 @@ class RawN0183Obs(RawObs):
         if self._data['Fields']['lat_dir'] == 'S':
             lat = - lat
         return (lon, lat)
+
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'MTW':
+            raise BadData()
+        temp = float(self._data['Fields']['temperature'])
+        unit = self._data['Fields']['units']
+        return uc.to_temperature_kelvin(temp, unit)
 
 
 class RawN2000Obs(RawObs):
@@ -905,6 +917,8 @@ class RawN2000Obs(RawObs):
             name = 'GNSS'
         elif pgn == 130577:
             name = 'DirectionData'
+        elif pgn == 130316 and self._data['Fields']['source'] == 0:
+            name = 'WaterTemperature'
         else:
             # Attempt to get the PGN name from the MARULC database.  We could do this for
             # all PGNs, but the names above are for data that we use everywhere, and we
@@ -951,6 +965,12 @@ class RawN2000Obs(RawObs):
             case _:
                 raise BadData()
 
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'WaterTemperature':
+            raise BadData()
+        temp = float(self._data['Fields']['temperature'])
+        return uc.to_temperature_kelvin(temp, 'K')
+
 
 class ParsedN2000(RawObs):
     def __init__(self, elapsed: int, data: DataPacket) -> None:
@@ -991,6 +1011,13 @@ class ParsedN2000(RawObs):
         if self.Name() != 'GNSS':
             raise BadData()
         return (self._data.longitude, self._data.latitude)
+
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'WaterTemperature':
+            raise BadData()
+        if self._data.tempSource != 0:
+            raise BadData()
+        return self._data.temperature
 
 def count_messages(messages: List[RawObs]) -> PktStats:
     """Determine the list of messages that are available in the input data source.
@@ -1061,50 +1088,14 @@ class Dataset:
         '''
         self.timesrc = determine_time_source(self.stats)
         self.timebase = generate_timebase(self.packets, self.timesrc)
-    
-    # def generate_observations(self, vars: list[str]) -> None:
-        # dep_var_table: dict[str, InterpTable] = {}
-        # for var in vars:
-        #     if var not in DEPENDENT_VARS.keys():
-        #         raise ValueError(f"Unknown dependent variable {var}")
-        #     dep_var_table[var] = InterpTable([DEPENDENT_VARS[var]])
-        #
-        # position_table = InterpTable(['lon', 'lat'])
-        #
-        # for obs in self.packets:
-        #     if obs.Elapsed() is None:
-        #         continue
-        #     obs_name = obs.Name()
-        #     if obs_name in vars:
-        #         dep_var_table[obs_name].add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], obs.Depth())
-        #     elif obs_name in ['GGA','GNSS']:
-        #         position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-        #     elif obs_name == 'Position, Rapid Update':
-        #         position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-        #
-        # # ind_timepoints: list[np.ndarray] = []
-        # any_timepoints: bool = False
-        # for k, v in dep_var_table:
-        #     var_timepoints = v.ind()
-        #     if len(var_timepoints) > 0:
-        #         any_timepoints = True
-        #     else:
-        #         # No time points for this var, continue processing next var
-        #         continue
-        #     # ind_timepoints.append(pts)
-        #     var = v.var(DEPENDENT_VARS[k])
-        #     var_times = self.timebase.interpolate(['ref',], var_timepoints)[0]
-        #     var_lat, var_lon = position_table.interpolate(['lat', 'lon'], var_timepoints)
-        #
-        # if not any_timepoints:
-        #     raise NoDepVars()
 
-    def generate_observations(self, obs_vars: list[str]) -> None:
-        vars = []
+
+    def generate_observations(self, obs_vars: Collection[str]) -> None:
+        vars = set()
         for ov in obs_vars:
             if ov not in DEPENDENT_VARS.keys():
                 raise ValueError(f"Unknown observation variable {ov}")
-            vars.append(DEPENDENT_VARS[ov])
+            vars.add(DEPENDENT_VARS[ov])
         dep_var_table = InterpTable(vars)
         position_table = InterpTable(['lon', 'lat'])
 
@@ -1113,10 +1104,14 @@ class Dataset:
                 continue
             obs_name = obs.Name()
             if obs_name in obs_vars:
+                val = None
                 match obs_name:
-                    case 'Depth':
+                    case 'Depth' | 'DPT' | 'DBT':
                         val = obs.Depth()
-                dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
+                    case 'WaterTemperature' | 'MTW':
+                        val = obs.WaterTemperature()
+                if val is not None:
+                    dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
             elif obs_name in ['GGA', 'GNSS']:
                 position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
             elif obs_name == 'Position, Rapid Update':
@@ -1125,13 +1120,27 @@ class Dataset:
         dep_var_timepoints = dep_var_table.ind()
         if len(dep_var_timepoints) == 0:
             raise NoDepths()
-        z = dep_var_table.var('z')
-        z_times = self.timebase.interpolate(['ref', ], dep_var_timepoints)[0]
-        z_lat, z_lon = position_table.interpolate(['lat', 'lon'], dep_var_timepoints)
-        
+        dep_vars = {}
+        for v in vars:
+            dep_vars[v] = dep_var_table.var(v)
+        times = self.timebase.interpolate(['ref', ], dep_var_timepoints)[0]
+        lat, lon = position_table.interpolate(['lat', 'lon'], dep_var_timepoints)
+
+        dep_cols = list(dep_vars.keys())
+        cols = ['t', 'lon', 'lat'] + dep_cols
+        emit_u: bool = False
+        if 'z' in vars:
+            cols += 'u'
+            emit_u: bool = True
+
         data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
         for n in range(dep_var_table.n_points()):
-            data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], [-1.0, -1.0, -1.0]]
+            row = [times[n], lon[n], lat[n]]
+            for dep_var in dep_vars.values():
+                row.append(dep_var[n])
+            if emit_u:
+                row.append([-1.0, -1.0, -1.0])
+            data.loc[len(data)] = row
 
         self.depths = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
 

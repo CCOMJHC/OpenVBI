@@ -1,7 +1,7 @@
 from pathlib import Path
 import uuid
 
-from openvbi.adaptors.ydvr import YDVRLoader
+from openvbi.adaptors import factory, Loader
 import openvbi.core.metadata as md
 from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
@@ -13,8 +13,8 @@ def test_basic_processing(data_path, temp_path):
 
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
-        loader = YDVRLoader(compressed=ydvr_file.suffix == '.lzma')
-        data = loader.load(ydvr_file)
+        loader: Loader = factory.get_loader(ydvr_file)
+        data = loader.load(ydvr_file, compressed=ydvr_file.suffix == '.lzma')
     except Exception as e:
         exception_thrown = True
     assert not exception_thrown
