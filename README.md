@@ -16,6 +16,42 @@ your environment will be set up.
 
 ## Usage
 
+At present, most functionality is accessed via the OpenVBI Python API, examples of 
+which can be found in the [examples](openvbi/examples) folder.
+
+There is a simple command line tool called `vbi`:
+```shell
+vbi --help
+Usage: vbi [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --version  Show the version and exit.
+  --help     Show this message and exit.
+
+Commands:
+  dump  Dump logger data file to ASCII format for debugging.
+```
+
+The `dump` command allows logger data files to be written as ASCII to the screen or to a file. To dump
+a file to the screen, run:
+```shell
+vbi dump tests/data/00000029.TSV.lzma -
+Packet 0: name: RMC
+	_data: {'Fields': {'timestamp': 123458, 'status': 'A', 'lat': 5048.614, 'lat_dir': 'N', 'lon': 108.632, 'lon_dir': 'W', 'spd_over_grnd': 0, 'true_course': 119.9, 'datestamp': 260822, 'mag_variation': 3.4, 'mag_var_dir': 'W'}, 'Talker': 'GP', 'Formatter': 'RMC'}
+Packet 1: name: RMB
+	_data: {'Fields': {'status': 'A', 'cross_track_error': '', 'cte_correction_dir': '', 'origin_waypoint_id': '', 'dest_waypoint_id': '', 'dest_lat': '', 'dest_lat_dir': '', 'dest_lon': '', 'dest_lon_dir': '', 'dest_range': '', 'dest_true_bearing': '', 'dest_velocity': '', 'arrival_alarm': 'V'}, 'Talker': 'GP', 'Formatter': 'RMB'}
+Packet 2: name: GLL
+	_data: {'Fields': {'lat': 5048.614, 'lat_dir': 'N', 'lon': 108.632, 'lon_dir': 'W', 'timestamp': 123458, 'status': 'A'}, 'Talker': 'GP', 'Formatter': 'GLL'}
+...
+...
+...
+```
+
+To output to a file, specify the output file name instead of '-' as the last argument:
+```shell
+vbi dump tests/data/00000029.TSV.lzma 00000029.txt
+```
+
 ## Testing
 Create a virtual environment with test dependencies:
 ```shell
