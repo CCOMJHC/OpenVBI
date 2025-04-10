@@ -23,11 +23,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from pathlib import Path
+
 import pandas
 import geopandas
+
 from openvbi.core.observations import RawN0183Obs, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from openvbi.adaptors import Loader
+from openvbi.adaptors import Loader, get_fopen, OpenVBIDataset
 
 class GenericASCIILoader(Loader):
     def __init__(self, maxelapsed: int, suffix: str) -> None:
@@ -37,7 +40,7 @@ class GenericASCIILoader(Loader):
     def suffix(self) -> str:
         return self.suffix
     
-    def load(self, filename: str) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         rtn: Dataset = Dataset()
 
         # The elapsed time is milliseconds since the start of logging, and can wrap round
@@ -47,7 +50,8 @@ class GenericASCIILoader(Loader):
         elapsed_offset: int = 0
         last_elapsed_mark: int = 0
 
-        with open(filename) as f:
+        fopen = get_fopen(filename)
+        with fopen(filename, mode='rt') as f:
             for line in f:
                 elapsed, message = line.split(' ')
                 elapsed = int(elapsed)
@@ -66,10 +70,13 @@ class PreparsedASCIILoader(Loader):
     def suffix(self) -> str:
         return '.csv'
     
-    def load(self, filename: str) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         data = Dataset()
-        depths = pandas.read_csv(filename)
-        # Translate from "Epoch,Longitude,Latitude,Depth" as input columns, to the standard set
-        depths = depths.rename(columns={'Epoch': 't', 'Longitude': 'lon', 'Latitude': 'lat', 'Depth': 'z'})
-        data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
-        return data
+
+        fopen = get_fopen(filename)
+        with fopen(filename, mode='rt') as f:
+            depths = pandas.read_csv(f)
+            # Translate from "Epoch,Longitude,Latitude,Depth" as input columns, to the standard set
+            depths = depths.rename(columns={'Epoch': 't', 'Longitude': 'lon', 'Latitude': 'lat', 'Depth': 'z'})
+            data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
+            return data

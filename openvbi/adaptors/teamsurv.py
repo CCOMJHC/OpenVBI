@@ -27,7 +27,7 @@ from pathlib import Path
 
 from openvbi.core.observations import RawN0183Obs, BadData, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from openvbi.adaptors import Loader
+from openvbi.adaptors import Loader, get_fopen, OpenVBIDataset
 
 
 LOADER_SUFFIX: str = '.TSV'
@@ -37,10 +37,11 @@ class TeamSurvLoader(Loader):
     def suffix(self) -> str:
         return LOADER_SUFFIX
 
-    def load(self, filename: str | Path, **kwargs) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         rtn: Dataset = Dataset()
 
-        with open(filename, encoding='windows-1252') as f:
+        fopen = get_fopen(filename)
+        with fopen(filename, mode='rt', encoding='windows-1252') as f:
             for message in f:
                 try:
                     obs = RawN0183Obs(None, message)

@@ -14,7 +14,7 @@ def test_basic_processing(data_path, temp_path):
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
         loader: Loader = factory.get_loader(ydvr_file)
-        data = loader.load(ydvr_file, compressed=ydvr_file.suffix == '.lzma')
+        data = loader.load(ydvr_file)
     except Exception as e:
         exception_thrown = True
     assert not exception_thrown

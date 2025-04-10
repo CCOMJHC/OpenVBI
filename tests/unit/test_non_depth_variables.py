@@ -14,7 +14,7 @@ def test_ydvr_non_depth(data_path, temp_path):
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
         loader: Loader = factory.get_loader(ydvr_file)
-        data = loader.load(ydvr_file, compressed=ydvr_file.suffix == '.lzma')
+        data = loader.load(ydvr_file)
         data.generate_observations(['Depth'])
     except Exception as e:
         exception_thrown = True

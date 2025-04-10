@@ -23,16 +23,45 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Protocol
+from typing import Protocol, Callable, TypeVar
 from pathlib import Path
+import gzip
+import bz2
+import lzma
+
+import geopandas
+
+import openvbi.core.metadata as md
 from openvbi.core.observations import Dataset
 
+
+def get_fopen(filename: str | Path) -> Callable:
+    if isinstance(filename, Path):
+        fname: Path = filename
+    elif isinstance(filename, str):
+        fname: Path = Path(filename)
+    else:
+        raise ValueError(f"Expected filename to be of type str or Path but it was {type(filename)}.")
+
+    match fname.suffix:
+        case '.gz' | '.gzip':
+            return gzip.open
+        case '.bz2' | '.bzip2':
+            return bz2.open
+        case 'lz' | '.lzma':
+            return lzma.open
+        case _:
+            return open
+
+# Type aliases
+GeoPandasDataset = tuple[geopandas.GeoDataFrame, md.Metadata]
+OpenVBIDataset = TypeVar('OpenVBIDataset', bound=Dataset|GeoPandasDataset)
 
 class Loader(Protocol):
     def suffix(self) -> str:
         pass
 
-    def load(self, filename: str | Path, **kwargs) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         pass
 
 

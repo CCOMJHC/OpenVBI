@@ -22,22 +22,25 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-from pathlib import Path
-from typing import Dict,Tuple,Any
-import geopandas
-import pandas
-import numpy as np
 import json
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Tuple
+
+import geopandas
+import numpy as np
+import pandas
+
 import openvbi.core.metadata as md
+from openvbi.adaptors import Loader, Writer, OpenVBIDataset
 from openvbi.core.observations import Dataset
-from openvbi.adaptors import Loader, Writer
+
 
 class CSVLoader(Loader):
     def suffix(self) -> str:
         return '.csv'
     
-    def load(self, filename: str) -> Tuple[geopandas.GeoDataFrame, md.Metadata]:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         data = geopandas.read_file(filename)
         data = data.rename(columns={'DEPTH': 'z', 'LON': 'lon', 'LAT': 'lat'})
         data['t'] = np.fromiter((t.timestamp() for t in pandas.to_datetime(data['TIME'])), dtype='float')

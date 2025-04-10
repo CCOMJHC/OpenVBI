@@ -16,7 +16,7 @@ from typing import Dict, Any
 from pathlib import Path
 
 import openvbi.adaptors.logger_file as LoggerFile
-from openvbi.adaptors import Loader
+from openvbi.adaptors import Loader, get_fopen, OpenVBIDataset
 from openvbi.core.observations import RawN0183Obs, ParsedN2000, Dataset
 from openvbi.core.metadata import VerticalReference, VerticalReferencePosition
 
@@ -28,13 +28,14 @@ class WIBLLoader(Loader):
     def suffix(self) -> str:
         return LOADER_SUFFIX
     
-    def load(self, filename: str | Path, **kwargs) -> Dataset:
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
         data: Dataset = Dataset()
         logger_UUID: str = 'NONE'
         ship_name: str = 'Anonymous'
         firmware_version: str = '0.0.0'
 
-        with open(filename, 'rb') as f:
+        fopen = get_fopen(filename)
+        with fopen(filename, mode='rb') as f:
             source = LoggerFile.PacketFactory(f)
             while source.has_more():
                 try:
