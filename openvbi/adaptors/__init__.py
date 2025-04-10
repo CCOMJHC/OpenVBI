@@ -48,7 +48,7 @@ def get_fopen(filename: str | Path) -> Callable:
             return gzip.open
         case '.bz2' | '.bzip2':
             return bz2.open
-        case 'lz' | '.lzma':
+        case '.lz' | '.lzma':
             return lzma.open
         case _:
             return open
