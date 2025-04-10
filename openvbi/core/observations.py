@@ -273,21 +273,6 @@ class RawN0183Obs(RawObs):
     #     ],
     #     "Description": "Recommended Minimum Specific GPS/TRANSIT Data"
     # },
-    # TODO: Add support for temperature data
-    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea0183_sentence_formatters.json#L1465C9-L1477C11
-    # "MTW": {
-    #     "Fields": [
-    #         {
-    #             "Id": "temperature",
-    #             "Description": "Water temperature"
-    #         },
-    #         {
-    #             "Id": "units",
-    #             "Description": "Unit of measurement"
-    #         }
-    #     ],
-    #     "Description": "Water Temperature"
-    # },
     def __init__(self, elapsed: int, message: str) -> None:
         parser = NMEA0183Parser()
         try:
@@ -812,80 +797,6 @@ class RawN2000Obs(RawObs):
     #             "BitStart": 0,
     #             "Units": "m/s",
     #             "Resolution": "0.01",
-    #             "Signed": false}]},
-    # TODO: Add support for temperature data
-    # https://github.com/MO-RISE/marulc/blob/master/marulc/nmea2000_pgn_specifications.json#L20174C7-L20245C31
-    # {
-    #     "PGN": 130316,
-    #     "Id": "temperatureExtendedRange",
-    #     "Description": "Temperature Extended Range",
-    #     "Type": "Single",
-    #     "Complete": true,
-    #     "Length": 8,
-    #     "RepeatingFields": 0,
-    #     "Fields": [
-    #         {
-    #             "Order": 1,
-    #             "Id": "sid",
-    #             "Name": "SID",
-    #             "BitLength": 8,
-    #             "BitOffset": 0,
-    #             "BitStart": 0,
-    #             "Signed": false},
-    #         {
-    #             "Order": 2,
-    #             "Id": "instance",
-    #             "Name": "Instance",
-    #             "BitLength": 8,
-    #             "BitOffset": 8,
-    #             "BitStart": 0,
-    #             "Signed": false},
-    #         {
-    #             "Order": 3,
-    #             "Id": "source",
-    #             "Name": "Source",
-    #             "BitLength": 8,
-    #             "BitOffset": 16,
-    #             "BitStart": 0,
-    #             "Type": "Lookup table",
-    #             "Signed": false,
-    #             "EnumValues": [
-    #                 {"name": "Sea Temperature", "value": "0"},
-    #                 {"name": "Outside Temperature", "value": "1"},
-    #                 {"name": "Inside Temperature", "value": "2"},
-    #                 {"name": "Engine Room Temperature", "value": "3"},
-    #                 {"name": "Main Cabin Temperature", "value": "4"},
-    #                 {"name": "Live Well Temperature", "value": "5"},
-    #                 {"name": "Bait Well Temperature", "value": "6"},
-    #                 {"name": "Refridgeration Temperature", "value": "7"},
-    #                 {"name": "Heating System Temperature", "value": "8"},
-    #                 {"name": "Dew Point Temperature", "value": "9"},
-    #                 {"name": "Apparent Wind Chill Temperature", "value": "10"},
-    #                 {"name": "Theoretical Wind Chill Temperature", "value": "11"},
-    #                 {"name": "Heat Index Temperature", "value": "12"},
-    #                 {"name": "Freezer Temperature", "value": "13"},
-    #                 {"name": "Exhaust Gas Temperature", "value": "14"}]},
-    #         {
-    #             "Order": 4,
-    #             "Id": "temperature",
-    #             "Name": "Temperature",
-    #             "BitLength": 24,
-    #             "BitOffset": 24,
-    #             "BitStart": 0,
-    #             "Units": "K",
-    #             "Type": "Temperature (hires)",
-    #             "Resolution": "0.001",
-    #             "Signed": false},
-    #         {
-    #             "Order": 5,
-    #             "Id": "setTemperature",
-    #             "Name": "Set Temperature",
-    #             "BitLength": 16,
-    #             "BitOffset": 48,
-    #             "BitStart": 0,
-    #             "Units": "K",
-    #             "Type": "Temperature",
-    #             "Resolution": "0.1",
     #             "Signed": false}]},
     def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
         parser = NMEA2000Parser()
