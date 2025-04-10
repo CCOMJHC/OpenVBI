@@ -32,12 +32,20 @@ from pathlib import Path
 
 from openvbi.adaptors import Loader, teamsurv, wibl, ydvr
 
-def get_loader(input_file: Path) -> Loader:
+def get_loader(input_file: str | Path) -> Loader:
     """
 
     :rtype: Loader
     """
-    suffixes = input_file.suffixes
+    match input_file:
+        case str():
+            infile: Path = Path(input_file)
+        case Path():
+            infile: Path = input_file
+        case _:
+            raise ValueError(f"Expected input_file to be of type str or Path, but it was of type {type(input_file)}")
+
+    suffixes = infile.suffixes
     if len(suffixes) == 0:
         raise ValueError(f"Unable to infer loader type for input file {str(input_file)}, which has no filename suffix.")
 

@@ -79,7 +79,7 @@ class GenericASCIIWriter(Writer):
 
     def write(self, dataset: Dataset, basename: str | Path, **kwargs) -> None:
         """
-        Write ``dataset`` to file named ``basename``+'csv'. 
+        Write ``dataset`` to file named ``basename``+'csv'.
 
         If 'columns' is specified in kwargs (either a single string or a list of string) is specified to the write
         method, then that/those column(s) will be included in CSV ouput.
