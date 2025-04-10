@@ -78,5 +78,5 @@ class PreparsedASCIILoader(Loader):
             depths = pandas.read_csv(f)
             # Translate from "Epoch,Longitude,Latitude,Depth" as input columns, to the standard set
             depths = depths.rename(columns={'Epoch': 't', 'Longitude': 'lon', 'Latitude': 'lat', 'Depth': 'z'})
-            data.depths = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
+            data.data = geopandas.GeoDataFrame(depths, geometry=geopandas.points_from_xy(depths['lon'], depths['lat']), crs='EPSG:4326')
             return data

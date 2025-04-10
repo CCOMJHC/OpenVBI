@@ -89,5 +89,8 @@ class RawObs(ABC):
         """
         pass
 
-class NoDepths(RuntimeError):
+class NoDataFound(RuntimeError):
+    pass
+
+class NoDepths(NoDataFound):
     pass

@@ -69,20 +69,20 @@ class GeoJSONWriter(Writer):
     def write(self, dataset: Dataset, filename: str | Path, **kwargs) -> None:
         FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
         feature_lst = []
-        for n in range(len(dataset.depths)):
-            timestamp = datetime.fromtimestamp(dataset.depths['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
+        for n in range(len(dataset.data)):
+            timestamp = datetime.fromtimestamp(dataset.data['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
             feature = {
                 "type": "Feature",
                 "geometry": {
                     "type": "Point",
                     "coordinates": [
-                        dataset.depths['lon'].iloc[n],
-                        dataset.depths['lat'].iloc[n]
+                        dataset.data['lon'].iloc[n],
+                        dataset.data['lat'].iloc[n]
                     ]
                 },
                 "properties": {
-                    "depth": dataset.depths['z'].iloc[n],
-                    "uncertainty": dataset.depths['u'].iloc[n],
+                    "depth": dataset.data['z'].iloc[n],
+                    "uncertainty": dataset.data['u'].iloc[n],
                     "time": timestamp
                 }
             }
@@ -105,7 +105,7 @@ class CSVWriter(Writer):
             case _:
                 raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
 
-        working_depths = dataset.depths.copy()
+        working_depths = dataset.data.copy()
         working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
         working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
         meta = dataset.meta.metadata()

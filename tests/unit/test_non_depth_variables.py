@@ -1,21 +1,24 @@
 from pathlib import Path
-import uuid
 
 from openvbi.adaptors import factory, Loader
-import openvbi.core.metadata as md
+from openvbi.adaptors.dcdb import CSVWriter
 
 from tests.fixtures import data_path, temp_path
 
 
-def test_ydvr_non_depth(data_path, temp_path):
-    ydvr_file: Path = data_path / '00030011.DAT.lzma'
+def test_non_depth_nmea2000(data_path, temp_path):
+    data_file: Path = data_path / '00010001.DAT.lzma'
     exception_thrown: bool = False
-
     try:
-        # Load data from compressed YachtDevices file, and convert into a dataframe
-        loader: Loader = factory.get_loader(ydvr_file)
-        data = loader.load(ydvr_file)
-        data.generate_observations(['Depth'])
+        loader: Loader = factory.get_loader(data_file)
+        data = loader.load(data_file)
+        data.generate_observations(['Depth', 'WaterTemperature'])
+        # Write data to CSV file
+        basepath = temp_path / '00010001'
+        writer = CSVWriter()
+        writer.write(data, basepath)
+        assert basepath.with_suffix('.csv').exists()
     except Exception as e:
+        print(f"Error encountered: {str(e)}")
         exception_thrown = True
     assert not exception_thrown

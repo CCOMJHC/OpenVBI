@@ -37,7 +37,7 @@ from marulc.exceptions import ParseError, ChecksumError, PGNError
 
 import bitstruct
 
-from openvbi.core.types import TimeSource, RawObs, NoDepths
+from openvbi.core.types import TimeSource, RawObs, NoDataFound
 from openvbi.core.statistics import PktStats
 from openvbi.core.interpolation import InterpTable
 from openvbi.core.timebase import determine_time_source, generate_timebase
@@ -1070,7 +1070,7 @@ class Dataset:
     timesrc:    TimeSource
     timebase:   InterpTable
     meta:       md.Metadata
-    depths:     geopandas.GeoDataFrame
+    data:     geopandas.GeoDataFrame
 
     def __init__(self):
         self.packets = list()
@@ -1078,7 +1078,7 @@ class Dataset:
         self.timesrc = None
         self.timebase = None
         self.meta = md.Metadata()
-        self.depths = None
+        self.data = None
 
     def add_timebase(self) -> None:
         '''This determines, given a list ot raw packets, which time source should be used for
@@ -1119,7 +1119,7 @@ class Dataset:
 
         dep_var_timepoints = dep_var_table.ind()
         if len(dep_var_timepoints) == 0:
-            raise NoDepths()
+            raise NoDataFound()
         dep_vars = {}
         for v in vars:
             dep_vars[v] = dep_var_table.var(v)
@@ -1133,7 +1133,7 @@ class Dataset:
             cols += 'u'
             emit_u: bool = True
 
-        data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
+        data = pandas.DataFrame(columns=cols)
         for n in range(dep_var_table.n_points()):
             row = [times[n], lon[n], lat[n]]
             for dep_var in dep_vars.values():
@@ -1142,7 +1142,7 @@ class Dataset:
                 row.append([-1.0, -1.0, -1.0])
             data.loc[len(data)] = row
 
-        self.depths = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
+        self.data = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
 
         self.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, None, method='Linear Interpolation', algorithm='OpenVBI', version=version())
         self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, None, name='OpenVBI Default Uncertainty', parameters={}, version=version(), comment='Default (non-valid) uncertainty', reference='None')
