@@ -1070,7 +1070,7 @@ class Dataset:
     timesrc:    TimeSource
     timebase:   InterpTable
     meta:       md.Metadata
-    data:     geopandas.GeoDataFrame
+    data:       geopandas.GeoDataFrame
 
     def __init__(self):
         self.packets = list()

@@ -24,13 +24,14 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from pathlib import Path
+from datetime import datetime, timezone
 
 import pandas
 import geopandas
 
 from openvbi.core.observations import RawN0183Obs, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from openvbi.adaptors import Loader, get_fopen, OpenVBIDataset
+from openvbi.adaptors import Loader, Writer, get_fopen, OpenVBIDataset
 
 class GenericASCIILoader(Loader):
     def __init__(self, maxelapsed: int, suffix: str) -> None:
@@ -65,6 +66,57 @@ class GenericASCIILoader(Loader):
         rtn.timebase = generate_timebase(rtn.packets, rtn.timesrc)
         rtn.meta.setIdentifiers('NOTSET', 'Generic ASCII Inputs', '1.0')
         return rtn
+
+
+class GenericASCIIWriter(Writer):
+    """
+    Write Dataset to UTF-8 CSV file with default columns ['lon', 'lat', 'TIME', 'z']. If columns (either a single
+    string or a list of string) is specified to the write method, then that/those column(s) will be included in
+    CSV ouput.
+    """
+    def suffix(self) -> str:
+        return '.csv'
+
+    def write(self, dataset: Dataset, basename: str | Path, **kwargs) -> None:
+        """
+        Write ``dataset`` to file named ``basename``+'csv'. 
+
+        If 'columns' is specified in kwargs (either a single string or a list of string) is specified to the write
+        method, then that/those column(s) will be included in CSV ouput.
+        :param dataset:
+        :param basename:
+        :param kwargs:
+        :return:
+        """
+        match basename:
+            case str():
+                basepath: Path = Path(basename)
+            case Path():
+                basepath: Path = basename
+            case _:
+                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
+
+        cols = ['lon', 'lat', 'TIME', 'z']
+        hdrs = ['LON', 'LAT', 'TIME', 'DEPTH']
+        # Handle user-supplied columns
+        if 'columns' in kwargs:
+            user_cols = kwargs['columns']
+            if isinstance(user_cols, str):
+                user_cols = [user_cols]
+            elif not isinstance(user_cols, list):
+                raise ValueError(f"kwarg 'columns' is not a string or list, but must be. Type was {type(user_cols)}.")
+            for uc in user_cols:
+                if uc not in dataset.data:
+                    raise ValueError(f"User column {uc} is not present in dataset.")
+            user_hdrs = []
+            cols += user_cols
+            hdrs += [c.casefold().swapcase() for c in user_cols]
+
+        output_data = dataset.data.copy()
+        output_data['TIME'] = output_data['t'].transform(lambda x: datetime.fromtimestamp(x, tz=timezone.utc).isoformat() + 'Z')
+        output_data.to_csv(basepath.with_suffix('.csv'), columns=cols, index=False,
+                           header=hdrs)
+
 
 class PreparsedASCIILoader(Loader):
     def suffix(self) -> str:

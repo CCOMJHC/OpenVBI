@@ -25,7 +25,6 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Tuple
 
 import geopandas
 import numpy as np
@@ -106,7 +105,7 @@ class CSVWriter(Writer):
                 raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
 
         working_depths = dataset.data.copy()
-        working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.utcfromtimestamp(x).isoformat() + 'Z')
+        working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.fromtimestamp(x, tz=timezone.utc).isoformat() + 'Z')
         working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
         meta = dataset.meta.metadata()
         meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
