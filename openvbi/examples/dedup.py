@@ -17,7 +17,7 @@ data = loader.load('/data/wibl-raw.N1K.csv')
 endTime = time.perf_counter()
 print(f'LoadData:             {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
-print(data.depths)
+print(data.data)
 
 report_metadata(data.meta, 'Before deduplication')
 
@@ -25,7 +25,7 @@ startTime = time.perf_counter()
 dedup = deduplicate(verbose=True)
 deduped_data = dedup.Execute(data)
 endTime = time.perf_counter()
-print(deduped_data.depths)
+print(deduped_data.data)
 print(f'Deduplicate:          {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 
 report_metadata(deduped_data.meta, 'After deduplication')

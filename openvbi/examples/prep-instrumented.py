@@ -26,11 +26,11 @@ print(f'GenerateObservations: {1000*(endTime - startTime):8.3f} ms (started {sta
 
 print('\nSource data after load:')
 with pandas.option_context('display.float_format', '{:.6f}'.format):
-    print(data.depths)
-min_depth = data.depths['z'].min()
-max_depth = data.depths['z'].max()
-min_time = data.depths['t'].min() + 10.0*60.0 # Remove first ten minutes
-max_time = data.depths['t'].max() - 10.0*60.0 # Remove last ten minutes
+    print(data.data)
+min_depth = data.data['z'].min()
+max_depth = data.data['z'].max()
+min_time = data.data['t'].min() + 10.0 * 60.0 # Remove first ten minutes
+max_time = data.data['t'].max() - 10.0 * 60.0 # Remove last ten minutes
 depth_range = max_depth - min_depth
 shoal_threshold = min_depth + depth_range/3.0
 deep_threshold = max_depth - depth_range/3.0
@@ -46,7 +46,7 @@ endTime = time.perf_counter()
 print(f'Filters:              {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
 print('\nAfter filtering, source data are:')
 with pandas.option_context('display.float_format', '{:.6f}'.format):
-    print(data.depths)
+    print(data.data)
 report_metadata(data.meta, "After filter, metadata is:")
 
 startTime = time.perf_counter()
@@ -66,9 +66,9 @@ startTime = time.perf_counter()
 single_station_wl.correct(src_depths)
 endTime = time.perf_counter()
 print(f'CorrectSingleStation: {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
-print('\nAfter single-station correction, depths are')
+print('\nAfter single-station correction, data are')
 with pandas.option_context('display.float_format', '{:.6f}'.format):
-    print(src_depths.depths)
+    print(src_depths.data)
 report_metadata(src_depths.meta, 'Single Station Metadata')
 
 src_depths = copy.deepcopy(data)
@@ -76,7 +76,7 @@ startTime = time.perf_counter()
 zone_tide_wl.correct(src_depths)
 endTime = time.perf_counter()
 print(f'CorrectZoneTides:     {1000*(endTime - startTime):8.3f} ms (started {startTime:.3f}, completed {endTime:.3f})')
-print('\nAfter zone-tide correction, depths are:')
+print('\nAfter zone-tide correction, data are:')
 with pandas.option_context('display.float_format', '{:.6f}'.format):
-    print(src_depths.depths)
+    print(src_depths.data)
 report_metadata(src_depths.meta, 'Zone-tide Metadata')

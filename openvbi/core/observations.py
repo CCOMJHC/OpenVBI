@@ -23,22 +23,37 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections.abc import Collection
 from typing import List, Tuple
 import datetime
 from dataclasses import dataclass
+
 import pandas
 import geopandas
+
 from marulc import NMEA0183Parser, NMEA2000Parser
 from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
+
 import bitstruct
-from openvbi.core.types import TimeSource, RawObs, NoDepths
+
+from openvbi.core.types import TimeSource, RawObs, NoDataFound
 from openvbi.core.statistics import PktStats
 from openvbi.core.interpolation import InterpTable
 from openvbi.core.timebase import determine_time_source, generate_timebase
 import openvbi.core.metadata as md
+import openvbi.core.unit_conversion as uc
 from openvbi import version
 from openvbi.adaptors.logger_file import DataPacket
+
+
+DEPENDENT_VARS = {'Depth': 'z',                     # NMEA2000
+                  'DPT': 'z',                       # NMEA0183
+                  'DBT': 'z',                       # NMEA0183
+                  'WaterTemperature': 'waterTemp',  # NMEA2000
+                  'MTW': 'waterTemp'                # NMEA0183
+                 }
+
 
 class BadData(Exception):
     pass
@@ -70,9 +85,18 @@ class RawN0183Obs(RawObs):
     def Timestamp(self) -> float:
         if not self.HasTime():
             return -1.0
-        base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
-        time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
-        reftime = base_date + time_offset
+
+        match self.Name():
+            case 'ZDA':
+                base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
+                time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
+            case 'RMC':
+                base_date = datetime.datetime.strptime(str(self._data['Fields']['datestamp']), '%d%m%y')
+                time_offset = datetime.datetime.strptime(str(self._data['Fields']['timestamp']), '%H%M%S') - datetime.datetime(1900, 1, 1)
+            case _:
+                raise ValueError(f"Unable to parse timestamp for NMEA0183 message of name {self.Name()}")
+
+        reftime = (base_date + time_offset).astimezone(tz=datetime.timezone.utc)
         return reftime.timestamp()
     
     def Depth(self) -> float:
@@ -94,7 +118,15 @@ class RawN0183Obs(RawObs):
         if self._data['Fields']['lat_dir'] == 'S':
             lat = - lat
         return (lon, lat)
-    
+
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'MTW':
+            raise BadData()
+        temp = float(self._data['Fields']['temperature'])
+        unit = self._data['Fields']['units']
+        return uc.to_temperature_kelvin(temp, unit)
+
+
 class RawN2000Obs(RawObs):
     def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
         parser = NMEA2000Parser()
@@ -124,6 +156,10 @@ class RawN2000Obs(RawObs):
             name = 'COG'
         elif pgn == 129029:
             name = 'GNSS'
+        elif pgn == 130577:
+            name = 'DirectionData'
+        elif pgn == 130316 and self._data['Fields']['source'] == 0:
+            name = 'WaterTemperature'
         else:
             # Attempt to get the PGN name from the MARULC database.  We could do this for
             # all PGNs, but the names above are for data that we use everywhere, and we
@@ -170,6 +206,12 @@ class RawN2000Obs(RawObs):
             case _:
                 raise BadData()
 
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'WaterTemperature':
+            raise BadData()
+        temp = float(self._data['Fields']['temperature'])
+        return uc.to_temperature_kelvin(temp, 'K')
+
 
 class ParsedN2000(RawObs):
     def __init__(self, elapsed: int, data: DataPacket) -> None:
@@ -210,6 +252,13 @@ class ParsedN2000(RawObs):
         if self.Name() != 'GNSS':
             raise BadData()
         return (self._data.longitude, self._data.latitude)
+
+    def WaterTemperature(self) -> float:
+        if self.Name() != 'WaterTemperature':
+            raise BadData()
+        if self._data.tempSource != 0:
+            raise BadData()
+        return self._data.temperature
 
 def count_messages(messages: List[RawObs]) -> PktStats:
     """Determine the list of messages that are available in the input data source.
@@ -262,7 +311,7 @@ class Dataset:
     timesrc:    TimeSource
     timebase:   InterpTable
     meta:       md.Metadata
-    depths:     geopandas.GeoDataFrame
+    data:       geopandas.GeoDataFrame
 
     def __init__(self):
         self.packets = list()
@@ -270,7 +319,7 @@ class Dataset:
         self.timesrc = None
         self.timebase = None
         self.meta = md.Metadata()
-        self.depths = None
+        self.data = None
 
     def add_timebase(self) -> None:
         '''This determines, given a list ot raw packets, which time source should be used for
@@ -280,34 +329,61 @@ class Dataset:
         '''
         self.timesrc = determine_time_source(self.stats)
         self.timebase = generate_timebase(self.packets, self.timesrc)
-    
-    def generate_observations(self, depth: str) -> None:
-        depth_table = InterpTable(['z',])
+
+
+    def generate_observations(self, obs_vars: Collection[str]) -> None:
+        vars = set()
+        for ov in obs_vars:
+            if ov not in DEPENDENT_VARS.keys():
+                raise ValueError(f"Unknown observation variable {ov}")
+            vars.add(DEPENDENT_VARS[ov])
+        dep_var_table = InterpTable(vars)
         position_table = InterpTable(['lon', 'lat'])
 
         for obs in self.packets:
             if obs.Elapsed() is None:
                 continue
-
-            if obs.Name() == depth:
-                depth_table.add_point(obs.Elapsed(), 'z', obs.Depth())
-            elif obs.Name() in ['GGA','GNSS']:
+            obs_name = obs.Name()
+            if obs_name in obs_vars:
+                val = None
+                match obs_name:
+                    case 'Depth' | 'DPT' | 'DBT':
+                        val = obs.Depth()
+                    case 'WaterTemperature' | 'MTW':
+                        val = obs.WaterTemperature()
+                if val is not None:
+                    dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
+            elif obs_name in ['GGA', 'GNSS']:
                 position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-            elif obs.Name() == 'Position, Rapid Update':
+            elif obs_name == 'Position, Rapid Update':
                 position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
-        
-        depth_timepoints = depth_table.ind()
-        if len(depth_timepoints) == 0:
-            raise NoDepths()
-        z = depth_table.var('z')
-        z_times = self.timebase.interpolate(['ref',], depth_timepoints)[0]
-        z_lat, z_lon = position_table.interpolate(['lat', 'lon'], depth_timepoints)
-        
-        data = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
-        for n in range(depth_table.n_points()):
-            data.loc[len(data)] = [z_times[n], z_lon[n], z_lat[n], z[n], [-1.0, -1.0, -1.0]]
 
-        self.depths = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
+        dep_var_timepoints = dep_var_table.ind()
+        if len(dep_var_timepoints) == 0:
+            raise NoDataFound()
+        dep_vars = {}
+        for v in vars:
+            dep_vars[v] = dep_var_table.var(v)
+        times = self.timebase.interpolate(['ref', ], dep_var_timepoints)[0]
+        lat, lon = position_table.interpolate(['lat', 'lon'], dep_var_timepoints)
+
+        dep_cols = list(dep_vars.keys())
+        cols = ['t', 'lon', 'lat'] + dep_cols
+        emit_u: bool = False
+        if 'z' in vars:
+            cols += 'u'
+            emit_u: bool = True
+
+        data = pandas.DataFrame(columns=cols)
+        for n in range(dep_var_table.n_points()):
+            row = [times[n], lon[n], lat[n]]
+            for dep_var in dep_vars.values():
+                row.append(dep_var[n])
+            if emit_u:
+                row.append([-1.0, -1.0, -1.0])
+            data.loc[len(data)] = row
+
+        self.data = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
 
         self.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, None, method='Linear Interpolation', algorithm='OpenVBI', version=version())
         self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, None, name='OpenVBI Default Uncertainty', parameters={}, version=version(), comment='Default (non-valid) uncertainty', reference='None')

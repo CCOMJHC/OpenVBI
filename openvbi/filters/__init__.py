@@ -35,7 +35,7 @@ class Filter(ABC):
         pass
 
     def Execute(self, dataset: Dataset) -> Dataset:
-        dataset.depths = self._execute(dataset.depths)
+        dataset.data = self._execute(dataset.data)
         self._metadata(dataset.meta)
         return dataset
 
