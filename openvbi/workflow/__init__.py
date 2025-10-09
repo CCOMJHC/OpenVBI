@@ -42,13 +42,13 @@ class WorkflowEvent(Enum):
 
 class Workflow(Protocol):
     def insuffix(self) -> str:
-        pass
+        ...
     def outsuffix(self) -> str:
-        pass
-    def process_file(self, infile: str | Path, outfile: str | Path, callback: Callable[[WorkflowEvent,Dict],None]) -> Tuple[bool,Dict]:
-        pass
+        ...
+    def process_file(self, infile: str | Path, outfile: str | Path, callback: Callable[[WorkflowEvent,Dict],None]|None) -> Tuple[bool,Dict]:
+        ...
 
-def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workflow, callback: Callable[[WorkflowEvent,Dict],None] = None) -> Tuple[bool,List[str],List[Dict]]:
+def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workflow, callback: Callable[[WorkflowEvent,Dict],None]|None = None) -> Tuple[bool,List[str],List[Dict]]:
     errors = []
     processed = []
     rc = True
