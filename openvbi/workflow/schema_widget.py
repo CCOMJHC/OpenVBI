@@ -31,8 +31,6 @@
 TODO:
     - Add validation for patterns
     - Add support for non-string fields (integer, enum, array)
-    - Add * to label for required fields
-    - Right justify labels
     - Use localization to provide friendly names for fields
     - Add tooltips with descriptions for fields
     - For fields that are controlled vocabularies, provide drop-downs instead of free text
@@ -48,13 +46,14 @@ import json
 
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox as msgbox
 from tkinter import filedialog
 
 from openvbi.core.schema import SchemaObject, SchemaRef, \
-    SchemaLeafString, SchemaLeafInteger, SchemaArray
+    SchemaLeafString, SchemaLeafInteger, SchemaLeafNumber, SchemaLeafBoolean, SchemaArray
 
 class SchemaNodeWidgetsRenderer(ABC):
-    def validate(self) -> bool:
+    def validate(self) -> tuple[bool,str]:
         ...
 
 class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
@@ -82,20 +81,18 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
             self.entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
             self.is_invalid = False
 
-    def validate(self) -> bool:
-        print("SchemaLeafStringRenderer.validate() called...")
+    def validate(self) -> tuple[bool, str]:
         if self.required and self.stringVar.get() == '':
-            print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
             self.set_invalid(True)
-            return False
+            return False, f"{self.name}: required, but no value set"
 
         if self.pattern is not None:
             if self.pattern.fullmatch(self.stringVar.get()) is None:
                 self.set_invalid(True)
-                return False
+                return False, f"{self.name}: value does not match the pattern given"
 
         self.set_invalid(False)
-        return True
+        return True, ""
 
 class SchemaLeafStringEnumRenderer(SchemaNodeWidgetsRenderer):
     def __init__(self, parent_frame, name: str, leaf: SchemaLeafString, state: dict, row: int, column: int,
@@ -126,15 +123,13 @@ class SchemaLeafStringEnumRenderer(SchemaNodeWidgetsRenderer):
             # self.entry.configure(bordercolor='grey')
             self.is_invalid = False
 
-    def validate(self) -> bool:
-        print("SchemaLeafStringRenderer.validate() called...")
+    def validate(self) -> tuple[bool, str]:
         if self.required and self.stringVar.get() == '':
-            print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
             self.set_invalid(True)
-            return False
+            return False, f"{self.name}: required, but no value set"
 
         self.set_invalid(False)
-        return True
+        return True, ""
 
 class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
     def __init__(self, parent_frame, name: str, leaf: SchemaLeafInteger, state: dict, row: int, column: int,
@@ -145,6 +140,7 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
         self.required = leaf.is_required
         self.minimum = leaf.minimum
         self.maximum = leaf.maximum
+        # TODO: Consider making this an IntVar() instead, which would simplify validation
         self.stringVar = tk.StringVar()
         state[name] = self.stringVar
         self.entry = tk.Entry(parent_frame, highlightthickness=1, textvariable=state[name])
@@ -159,31 +155,99 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
             self.entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
             self.is_invalid = False
 
-    def validate(self) -> bool:
-        print("SchemaLeafIntegerRenderer.validate() called...")
+    def validate(self) -> tuple[bool, str]:
         if self.required and self.stringVar.get() == '':
-            print(f"SchemaLeafString:{self.name} is not valid because it is a required but no value was provided")
             self.set_invalid(True)
-            return False
+            return False, f"{self.name}: required, but no value set"
 
         try:
             int_val: int = int(self.stringVar.get())
         except ValueError:
             self.set_invalid(True)
-            return False
+            return False, f"{self.name}: value is not a valid integer"
 
         if self.minimum:
             if int_val < self.minimum:
                 self.set_invalid(True)
-                return False
+                return False, f"{self.name}: value is less than {self.minimum} limit"
 
         if self.maximum:
             if int_val > self.maximum:
                 self.set_invalid(True)
-                return False
+                return False, f"{self.name}: value is more than {self.maximum} limit"
 
         self.set_invalid(False)
-        return True
+        return True, ""
+    
+class SchemaLeafNumberRenderer(SchemaNodeWidgetsRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaLeafNumber, state: dict, row: int, column: int,
+                 *,
+                 pad_x: int = 10,
+                 pad_y: int = 5):
+        self.name = name
+        self.required = leaf.is_required
+        self.minimum = leaf.minimum
+        self.maximum = leaf.maximum
+        self.numberVar = tk.DoubleVar()
+        state[name] = self.numberVar
+        self.entry = tk.Entry(parent_frame, highlightthickness=1, textvariable=state[name])
+        self.entry.grid(row=row, column=column)
+        self.set_invalid(False)
+    
+    def set_invalid(self, is_invalid: bool):
+        if is_invalid:
+            self.entry.configure(highlightbackground='red', highlightcolor='red', highlightthickness=1)
+            self.is_invalid = True
+        else:
+            self.entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
+            self.is_invalid = False
+
+    def validate(self) -> tuple[bool, str]:
+        try:
+            num_val: float = self.numberVar.get()
+        except ValueError:
+            self.set_invalid(True)
+            return False, f"{self.name}: value is not a valid float"
+
+        if self.minimum:
+            if num_val < self.minimum:
+                self.set_invalid(True)
+                return False, f"{self.name}: value is less than {self.minimum} limit"
+
+        if self.maximum:
+            if num_val > self.maximum:
+                self.set_invalid(True)
+                return False, f"{self.name}: value is more than {self.maximum} limit"
+
+        self.set_invalid(False)
+        return True, ""
+    
+class SchemaLeafBooleanRenderer(SchemaNodeWidgetsRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaLeafBoolean, state: dict, row: int, column: int,
+                 *,
+                 pad_x: int = 10,
+                 pad_y: int = 5):
+        self.name = name
+        self.required = leaf.is_required
+        self.checkVar = tk.BooleanVar()
+        state[name] = self.checkVar
+        self.checkButton = tk.Checkbutton(parent_frame, variable=state[name], onvalue=True, offvalue=False)
+        self.checkButton.grid(column=column, row=row)
+        self.set_invalid(False)
+    
+    def set_invalid(self, is_invalid: bool):
+        if is_invalid:
+            self.checkButton.configure(highlightcolor='red', highlightthickness=1)
+            self.is_valid = False
+        else:
+            self.checkButton.configure(highlightcolor='grey', highlightthickness=1)
+            self.is_valid = True
+
+    def validate(self) -> tuple[bool, str]:
+        # For a boolean, even if it's marked "required", there's always a state to use,
+        # and therefore nothing to validate --- it's always valid.
+        self.set_invalid(False)
+        return True, ""
 
 class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
     def __init__(self, parent_frame, name: str, obj: SchemaObject, state: dict,
@@ -200,30 +264,50 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
                 # TODO: Remove after we have implemented all node types, after which no nodes will be None
                 continue
             if value.is_required:
-                label: str = f"{prop}*"
+                label: str = f"{prop} *"
             else:
                 label: str = prop
+            if isinstance(value, SchemaRef):
+                value = value.referent
+                if value is None:
+                    print(f'error: reference {prop} has no referent.')
+                    continue
             tk.Label(parent_frame, text=label, anchor='e', justify='right').grid(sticky=tk.E, column=0, row=row)
+            processed: bool = False
             if isinstance(value, SchemaLeafString):
                 if value.enum_values is None:
                     self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
                 else:
                     self.properties[prop] = SchemaLeafStringEnumRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                processed = True
             if isinstance(value, SchemaLeafInteger):
                 self.properties[prop] = SchemaLeafIntegerRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                processed = True
+            if isinstance(value, SchemaLeafNumber):
+                self.properties[prop] = SchemaLeafNumberRenderer(parent_frame, prop, value, self.state, column=1,
+                                                                 row=row)
+                processed = True
+            if isinstance(value, SchemaLeafBoolean):
+                self.properties[prop] = SchemaLeafBooleanRenderer(parent_frame, prop, value, self.state, row=row, column=1)
+                processed = True
             if isinstance(value, SchemaArray):
                 array_frame = tk.Frame(parent_frame)
                 self.properties[prop] = SchemaArrayWidgetsRenderer(array_frame, prop, value, self.state)
-                array_frame.grid(column=1, row=row)
+                array_frame.grid(column=1, row=row)      
+                processed = True
+            if not processed:
+                print(f"error: have not yet implemented rendering of note type {type(value)}/{prop}")
             row += 1
 
-    def validate(self) -> bool:
-        print("SchemaObjectWidgetsRenderer.validate() called...")
+    def validate(self) -> tuple[bool, str]:
         valid: bool = True
+        messages: list[str] = []
         for p in self.properties.values():
-            if not p.validate():
+            rc, msg = p.validate()
+            if not rc:
                 valid = False
-        return valid
+                messages.append(msg)
+        return valid, "\n".join(messages)
 
 class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
     hor_pad = 10
@@ -243,6 +327,9 @@ class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
         self.preview.grid(column=0, row=0)
         self.open_button = tk.Button(parent, text="Edit...", command=self.open)
         self.open_button.grid(column=1, row=0)
+
+    def validate(self) -> tuple[bool, str]:
+        return True, ""
 
     def open(self):
         if not self.is_open:
@@ -281,13 +368,15 @@ class SchemaRefWidgetsRenderer(SchemaNodeWidgetsRenderer):
 
         self.frame.pack(fill='x')
 
-    def validate(self) -> bool:
-        print("SchemaRefWidgetsRenderer.validate() called...")
+    def validate(self) -> tuple[bool, str]:
         valid: bool = True
+        messages: list[str] = []
         for r in self.referents.values():
-            if not r.validate():
+            rc, msg = r.validate()
+            if not rc:
                 valid = False
-        return valid
+                messages.append(msg)
+        return valid, '\n'.join(messages)
 
 def generate_output(d: dict) -> dict:
     ser = {}
@@ -295,6 +384,10 @@ def generate_output(d: dict) -> dict:
         if isinstance(v, dict):
             ser[k] = generate_output(v)
         elif isinstance(v, tk.StringVar):
+            ser[k] = v.get()
+        elif isinstance(v, tk.BooleanVar):
+            ser[k] = v.get()
+        elif isinstance(v, tk.DoubleVar):
             ser[k] = v.get()
     return ser
 
@@ -310,19 +403,30 @@ class MetadataMainWindow:
             self.filename_entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
             self.is_invalid = False
 
-    def validate(self) -> bool:
-        print("MainWindow.validate() called...")
+    def validate(self) -> tuple[bool, list[str]]:
         valid: bool = True
+        messages: list[str] = []
         # First validate properties against schema
         for p in self.properties.values():
-            if not p.validate():
+            rc, msg = p.validate()
+            if not rc:
                 valid = False
+                messages.append(msg)
         # Now make sure meta properties (like output filename) are valid
         if self.export_filename.get() == '':
             self.set_export_filename_invalid(True)
+            valid = False
+            messages.append("Output filename not set")
         else:
             self.set_export_filename_invalid(False)
-        return valid
+        return valid, messages
+    
+    def on_validate(self):
+        is_valid, messages = self.validate()
+        if is_valid:
+            msgbox.showinfo("Validation", "All metadata fields appear to be valid")
+        else:
+            msgbox.showerror("Validation", "Metadata validation failed:\n" + "\n".join(messages))
 
     def set_export_filename(self):
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
@@ -340,9 +444,9 @@ class MetadataMainWindow:
         return True
 
     def do_export(self):
-        is_valid: bool = self.validate()
+        is_valid, messages = self.validate()
         if not is_valid:
-            print("Normally we'd stop exporting because validation failed...")
+            print(f"Note validation failed: {messages}")
         # Export
         self.serialize(Path(self.export_filename.get()))
 
@@ -374,7 +478,7 @@ class MetadataMainWindow:
         # Set up buttons for direct actions
         self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
 
-        self.validate_button = tk.Button(self.button_frame, text="Validate", command=self.validate)
+        self.validate_button = tk.Button(self.button_frame, text="Validate", command=self.on_validate)
         self.validate_button.grid(row=0, column=0)
 
         self.export_button = tk.Button(self.button_frame, text="Export", command=self.do_export)

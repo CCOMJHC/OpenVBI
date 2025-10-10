@@ -37,7 +37,7 @@ class SchemaNode(ABC):
     def __init__(self, name: str | None, path: str | None, parent: Optional['SchemaNode'],
                  *,
                  required: bool = False):
-        self.name: str = name
+        self.name: str|None = name
         if path is None:
             self.path = "#/"
         else:
@@ -46,10 +46,10 @@ class SchemaNode(ABC):
         self.is_required = required
 
     def to_string(self, *, depth: int = 1) -> str:
-        pass
+        ...
 
     def resolve(self, path: str) -> 'SchemaNode':
-        pass
+        ...
 
     def get_path(self) -> str:
         if self.parent is None:
@@ -67,8 +67,8 @@ class SchemaRef(SchemaNode):
     """
     Reference to another entity
     """
-    def __init__(self, name: str | None, path: str, parent: SchemaNode):
-        super().__init__(name, path, parent)
+    def __init__(self, name: str | None, path: str, parent: SchemaNode, *, required: bool = False):
+        super().__init__(name, path, parent, required=required)
         self.referent: SchemaNode | None = None
 
     def to_string(self, *, depth: int = 1) -> str:
@@ -167,7 +167,10 @@ class SchemaObject(SchemaNode):
                 if isinstance(v, dict):
                     if '$ref' in v:
                         # Property is a reference node
-                        parsed: SchemaRef = SchemaRef(k, v['$ref'], self)
+                        required: bool = False
+                        if k in self.required:
+                            required = True
+                        parsed: SchemaRef = SchemaRef(k, v['$ref'], self, required=required)
                         self.properties[k] = parsed
                         # Look at first element of path to record the defs key to later support
                         # resolving references to referents
@@ -390,6 +393,58 @@ class SchemaLeafInteger(SchemaLeaf):
         self.minimum = d.get('minimum')
         self.maximum = d.get('maximum')
 
+class SchemaLeafNumber(SchemaLeaf):
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent, required=required)
+        self.title: str | None
+        self.description: str | None
+        self.minimum: float | None
+        self.maximum: float | None
+
+        self._from_dict(d)
+    
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t\t' * depth
+        title = self.title if self.title is not None else 'nil'
+        desc = self.description if self.description is not None else 'nil'
+        minimum = self.minimum if self.minimum is not None else 'nil'
+        maximum = self.maximum if self.maximum is not None else 'nil'
+        parent = self.parent.name if self.parent is not None else 'nil'
+        return (f"{indent_root}SchemaLeafInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
+                f"description: {desc},\n{indent}minimum: {minimum},\n{indent}maximum: {maximum},\n{indent}parent: {parent},\n{indent}"
+                f"required: {self.is_required})")
+
+    def _from_dict(self, d: dict):
+        self.title = d.get('title')
+        self.description = d.get('description')
+        self.minimum = d.get('minimum')
+        self.maximum = d.get('maximum')
+
+class SchemaLeafBoolean(SchemaLeaf):
+    def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
+                 *,
+                 required: bool = False):
+        super().__init__(name, path, parent, required=required)
+        self.title: str | None = None
+        self.description: str | None = None
+        self._from_dict(d)
+
+    def to_string(self, *, depth: int = 1) -> str:
+        indent_root: str = '\t\t\t\t\t' * (depth - 1)
+        indent: str = '\t\t\t\t' * depth
+        title = self.title if self.title is not None else 'nil'
+        desc = self.description if self.description is not None else 'nil'
+        parent = self.parent.name if self.parent is not None else 'nil'
+        return (f"{indent_root}SchemaLeafBoolean(path: {self.path},\n{indent}title: {title},\n{indent}"
+                f"description: {desc},\n{indent}parent: {parent},\n{indent}"
+                f"required: {self.is_required})")
+
+    def _from_dict(self, d: dict):
+        self.title = d.get('title')
+        self.description = d.get('description')
 
 def parse_reference(schema: dict, parent: SchemaNode) -> SchemaRef:
     if '$ref' not in schema:
@@ -430,8 +485,20 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
             else:
                 is_required = required
             return SchemaLeafInteger(name, path, parent, schema, required=is_required)
+        case 'number':
+            if required is None:
+                is_required = False
+            else:
+                is_required = required
+            return SchemaLeafNumber(name, path, parent, schema, required=required)
+        case 'boolean':
+            if required is None:
+                is_required = False
+            else:
+                is_required = required
+            return SchemaLeafBoolean(name, path, parent, schema, required=is_required)
         case _:
-            print(f"Have not yet implemented parsing of schema of type {schema['type']}")
+            print(f"Have not yet implemented parsing of schema of type {schema['type']} | {name} | {path}")
 
 def open_schema(*, schema_filename: str = 'XYZ-CSB-schema-3_1_0-2024-04.json') -> dict:
     # TODO: Eventually add an API to csbschema to get the schema files in a safer way, for now this will do...
