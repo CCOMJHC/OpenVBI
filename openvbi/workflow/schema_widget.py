@@ -296,7 +296,7 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
                 array_frame.grid(column=1, row=row)      
                 processed = True
             if not processed:
-                print(f"error: have not yet implemented rendering of note type {type(value)}/{prop}")
+                print(f"error: have not yet implemented rendering of node type {type(value)} | {name} | {prop}")
             row += 1
 
     def validate(self) -> tuple[bool, str]:
@@ -403,7 +403,7 @@ class MetadataMainWindow:
             self.filename_entry.configure(highlightbackground='grey', highlightcolor='grey', highlightthickness=1)
             self.is_invalid = False
 
-    def validate(self) -> tuple[bool, list[str]]:
+    def validate_entries(self) -> tuple[bool, list[str]]:
         valid: bool = True
         messages: list[str] = []
         # First validate properties against schema
@@ -421,12 +421,12 @@ class MetadataMainWindow:
             self.set_export_filename_invalid(False)
         return valid, messages
     
-    def on_validate(self):
-        is_valid, messages = self.validate()
+    def on_preflight(self):
+        is_valid, messages = self.validate_entries()
         if is_valid:
-            msgbox.showinfo("Validation", "All metadata fields appear to be valid")
+            msgbox.showinfo("Preflight Check", "All metadata fields appear to be valid")
         else:
-            msgbox.showerror("Validation", "Metadata validation failed:\n" + "\n".join(messages))
+            msgbox.showerror("Preflight Check", "Metadata validation failed:\n" + "\n".join(messages))
 
     def set_export_filename(self):
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
@@ -444,7 +444,7 @@ class MetadataMainWindow:
         return True
 
     def do_export(self):
-        is_valid, messages = self.validate()
+        is_valid, messages = self.validate_entries()
         if not is_valid:
             print(f"Note validation failed: {messages}")
         # Export
@@ -478,7 +478,7 @@ class MetadataMainWindow:
         # Set up buttons for direct actions
         self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
 
-        self.validate_button = tk.Button(self.button_frame, text="Validate", command=self.on_validate)
+        self.validate_button = tk.Button(self.button_frame, text="Preflight Check", command=self.on_preflight)
         self.validate_button.grid(row=0, column=0)
 
         self.export_button = tk.Button(self.button_frame, text="Export", command=self.do_export)

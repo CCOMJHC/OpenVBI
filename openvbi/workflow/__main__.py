@@ -280,10 +280,18 @@ class MainWindow():
         self.workflow_thread.start()
 
 def main():
-    schema: dict = open_schema()
-    schema_node: SchemaNode = parse_schema(schema, None, None, None)
-    schema_obj: SchemaObject = cast(SchemaObject, schema_node)
-    schema_obj.resolve_refs()
+    try:
+        schema: dict = open_schema()
+        schema_node: SchemaNode = parse_schema(schema, None, None, None)
+        schema_obj: SchemaObject = cast(SchemaObject, schema_node)
+        n_resolved: int = 1
+        while n_resolved > 0:
+            n_resolved = schema_obj.resolve_refs()
+            print(f"Resolved {n_resolved} references")
+
+    except ValueError as e:
+        print(f'error: failed to parse schema: {e}')
+        sys.exit(1)
 
     root = tk.Tk()
     root.title("OpenVBI Workflow Tool")

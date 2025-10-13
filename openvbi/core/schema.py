@@ -119,7 +119,8 @@ class SchemaObject(SchemaNode):
         o.write(f"\n{indent_root})")
         return o.getvalue()
 
-    def resolve_refs(self, *, defs: dict | None = None):
+    def resolve_refs(self, *, defs: dict | None = None) -> int:
+        n_resolved: int = 0
         print(f"resolving refs for path: {self.path}")
         if defs is None:
             d: dict = self.defs
@@ -134,14 +135,18 @@ class SchemaObject(SchemaNode):
                 # TODO: Remove after we have implemented all node types, after which no nodes will be None
                 continue
             if isinstance(node, SchemaObject):
-                node.resolve_refs(defs=d)
+                n_resolved += node.resolve_refs(defs=d)
             elif isinstance(node, SchemaArray):
-                node.resolve_refs(defs=d)
+                n_resolved += node.resolve_refs(defs=d)
             elif isinstance(node, SchemaRef):
                 if node.path not in d:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = d[node.path]
+                    print(f'Attempting to resolve reference for {node.path} in {node.name}')
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = d[node.path]
+                        n_resolved += 1
 
         # Now resolve refs in this object's properties
         for node in self.properties.values():
@@ -149,21 +154,32 @@ class SchemaObject(SchemaNode):
                 # TODO: Remove after we have implemented all node types, after which no nodes will be None
                 continue
             if isinstance(node, SchemaObject):
-                node.resolve_refs(defs=d)
+                n_resolved += node.resolve_refs(defs=d)
             elif isinstance(node, SchemaArray):
-                node.resolve_refs(defs=d)
+                n_resolved += node.resolve_refs(defs=d)
             if isinstance(node, SchemaRef):
                 if node.path not in d:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = d[node.path]
+                    print(f'Attempting to resolve reference for {node.path} in {node.name}')
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = d[node.path]
+                        n_resolved += 1
 
+        return n_resolved
+    
     def _from_dict(self, d: dict):
         if 'required' in d:
             for r in d['required']:
                 self.required.add(r)
         if 'properties' in d:
             for k, v in d['properties'].items():
+                if k == 'features':
+                    # Features are defined in the schema, but they're constructed, rather than
+                    # specified.  Therefore we need to ignore them when parsing the schema to
+                    # construct the GUI.
+                    continue
                 if isinstance(v, dict):
                     if '$ref' in v:
                         # Property is a reference node
@@ -248,32 +264,46 @@ class SchemaArray(SchemaNode):
         o.write(f"\n{indent_root})")
         return o.getvalue()
 
-    def resolve_refs(self, *, defs: dict):
+    def resolve_refs(self, *, defs: dict) -> int:
+        n_resolved: int = 0
         print(f"resolving refs for path: {self.path}")
         for node in self.items:
             if isinstance(node, SchemaRef):
                 if node.path not in defs:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = defs[node.path]
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = defs[node.path]
+                        n_resolved += 1
         for node in self.items_all_of:
             if isinstance(node, SchemaRef):
                 if node.path not in defs:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = defs[node.path]
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = defs[node.path]
+                        n_resolved += 1
         for node in self.items_any_of:
             if isinstance(node, SchemaRef):
                 if node.path not in defs:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = defs[node.path]
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = defs[node.path]
+                        n_resolved += 1
         for node in self.items_one_of:
             if isinstance(node, SchemaRef):
                 if node.path not in defs:
-                    print("WARNING: Unable to resolve reference for node path {node.path}")
+                    print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    node.referent = defs[node.path]
+                    if not node.referent:
+                        print(f'Resolving reference for {node.path} in {node.name}')
+                        node.referent = defs[node.path]
+                        n_resolved += 1
+        return n_resolved
 
     def _from_dict(self, d: dict):
         self.unique_items = d.get('uniqueItems', False)
@@ -466,10 +496,14 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
     :return:
     """
     if 'type' not in schema:
-        raise ValueError("schema dictionary doesn't appear to represent a JSON Schema document.")
+        raise ValueError(f"schema dictionary doesn't appear to represent a JSON Schema document (no 'type' specified) for: {name} | {path}.")
 
     match schema['type']:
         case 'object':
+            if name == 'GeoJSONFeature':
+                # Special case: GeoJSONFeature is defined in the schema, but it's constructed, rather than
+                # specified.  Therefore we need to ignore it when parsing the schema to construct the GUI.
+                return None
             return SchemaObject(name, path, parent, schema)
         case 'array':
             return SchemaArray(name, path, parent, schema)
@@ -498,9 +532,9 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
                 is_required = required
             return SchemaLeafBoolean(name, path, parent, schema, required=is_required)
         case _:
-            print(f"Have not yet implemented parsing of schema of type {schema['type']} | {name} | {path}")
+            print(f"warning: have not yet implemented parsing of schema of type {schema['type']} | {name} | {path}")
 
-def open_schema(*, schema_filename: str = 'XYZ-CSB-schema-3_1_0-2024-04.json') -> dict:
+def open_schema(*, schema_filename: str = 'CSB-schema-3_1_0-2024-04.json') -> dict:
     # TODO: Eventually add an API to csbschema to get the schema files in a safer way, for now this will do...
     schema_path: Path = Path(str(resources.files('csbschema').joinpath(f"data/{schema_filename}")))
     assert schema_path.exists()
