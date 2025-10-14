@@ -121,7 +121,6 @@ class SchemaObject(SchemaNode):
 
     def resolve_refs(self, *, defs: dict | None = None) -> int:
         n_resolved: int = 0
-        print(f"resolving refs for path: {self.path}")
         if defs is None:
             d: dict = self.defs
         else:
@@ -142,9 +141,7 @@ class SchemaObject(SchemaNode):
                 if node.path not in d:
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    print(f'Attempting to resolve reference for {node.path} in {node.name}')
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = d[node.path]
                         n_resolved += 1
 
@@ -161,9 +158,7 @@ class SchemaObject(SchemaNode):
                 if node.path not in d:
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
-                    print(f'Attempting to resolve reference for {node.path} in {node.name}')
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = d[node.path]
                         n_resolved += 1
 
@@ -266,14 +261,12 @@ class SchemaArray(SchemaNode):
 
     def resolve_refs(self, *, defs: dict) -> int:
         n_resolved: int = 0
-        print(f"resolving refs for path: {self.path}")
         for node in self.items:
             if isinstance(node, SchemaRef):
                 if node.path not in defs:
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = defs[node.path]
                         n_resolved += 1
         for node in self.items_all_of:
@@ -282,7 +275,6 @@ class SchemaArray(SchemaNode):
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = defs[node.path]
                         n_resolved += 1
         for node in self.items_any_of:
@@ -291,7 +283,6 @@ class SchemaArray(SchemaNode):
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = defs[node.path]
                         n_resolved += 1
         for node in self.items_one_of:
@@ -300,7 +291,6 @@ class SchemaArray(SchemaNode):
                     print(f"WARNING: Unable to resolve reference for node path {node.path}")
                 else:
                     if not node.referent:
-                        print(f'Resolving reference for {node.path} in {node.name}')
                         node.referent = defs[node.path]
                         n_resolved += 1
         return n_resolved
@@ -359,7 +349,7 @@ class SchemaLeaf(SchemaNode, ABC):
                  required: bool = False):
         super().__init__(name, path, parent, required=required)
 
-class SchemaLeafString(SchemaLeaf):
+class SchemaString(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
                  *,
                  required: bool = False):
@@ -380,9 +370,9 @@ class SchemaLeafString(SchemaLeaf):
         desc = self.description if self.description is not None else 'nil'
         patt = self.pattern if self.pattern is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return (f"{indent_root}SchemaLeafString(path: {self.path},\n{indent}title: {title},\n{indent}"
+        return (f"{indent_root}SchemaString(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}pattern: {patt},\n{indent}parent: {parent},\n{indent}"
-                f"required: {self.is_required})")
+                f"required: {self.is_required}.\n{indent}enum_values: {self.enum_values})")
 
     def _from_dict(self, d: dict):
         self.title = d.get('title')
@@ -391,7 +381,7 @@ class SchemaLeafString(SchemaLeaf):
         if 'enum' in d and isinstance(d['enum'], list):
             self.enum_values: set | None = set(d['enum'])
 
-class SchemaLeafInteger(SchemaLeaf):
+class SchemaInteger(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
                  *,
                  required: bool = False):
@@ -413,7 +403,7 @@ class SchemaLeafInteger(SchemaLeaf):
         minimum = self.minimum if self.minimum is not None else 'nil'
         maximum = self.maximum if self.maximum is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return (f"{indent_root}SchemaLeafInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
+        return (f"{indent_root}SchemaInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}minimum: {minimum},\n{indent}maximum: {maximum},\n{indent}parent: {parent},\n{indent}"
                 f"required: {self.is_required})")
 
@@ -423,7 +413,7 @@ class SchemaLeafInteger(SchemaLeaf):
         self.minimum = d.get('minimum')
         self.maximum = d.get('maximum')
 
-class SchemaLeafNumber(SchemaLeaf):
+class SchemaNumber(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
                  *,
                  required: bool = False):
@@ -443,7 +433,7 @@ class SchemaLeafNumber(SchemaLeaf):
         minimum = self.minimum if self.minimum is not None else 'nil'
         maximum = self.maximum if self.maximum is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return (f"{indent_root}SchemaLeafInteger(path: {self.path},\n{indent}title: {title},\n{indent}"
+        return (f"{indent_root}SchemaNumber(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}minimum: {minimum},\n{indent}maximum: {maximum},\n{indent}parent: {parent},\n{indent}"
                 f"required: {self.is_required})")
 
@@ -453,7 +443,7 @@ class SchemaLeafNumber(SchemaLeaf):
         self.minimum = d.get('minimum')
         self.maximum = d.get('maximum')
 
-class SchemaLeafBoolean(SchemaLeaf):
+class SchemaBoolean(SchemaLeaf):
     def __init__(self, name: str, path: str | None, parent: SchemaNode | None, d: dict,
                  *,
                  required: bool = False):
@@ -468,7 +458,7 @@ class SchemaLeafBoolean(SchemaLeaf):
         title = self.title if self.title is not None else 'nil'
         desc = self.description if self.description is not None else 'nil'
         parent = self.parent.name if self.parent is not None else 'nil'
-        return (f"{indent_root}SchemaLeafBoolean(path: {self.path},\n{indent}title: {title},\n{indent}"
+        return (f"{indent_root}SchemaBoolean(path: {self.path},\n{indent}title: {title},\n{indent}"
                 f"description: {desc},\n{indent}parent: {parent},\n{indent}"
                 f"required: {self.is_required})")
 
@@ -512,25 +502,25 @@ def parse_schema(schema: dict, path: str | None, name: str | None, parent: Schem
                 is_required = False
             else:
                 is_required = required
-            return SchemaLeafString(name, path, parent, schema, required=is_required)
+            return SchemaString(name, path, parent, schema, required=is_required)
         case 'integer':
             if required is None:
                 is_required = False
             else:
                 is_required = required
-            return SchemaLeafInteger(name, path, parent, schema, required=is_required)
+            return SchemaInteger(name, path, parent, schema, required=is_required)
         case 'number':
             if required is None:
                 is_required = False
             else:
                 is_required = required
-            return SchemaLeafNumber(name, path, parent, schema, required=required)
+            return SchemaNumber(name, path, parent, schema, required=required)
         case 'boolean':
             if required is None:
                 is_required = False
             else:
                 is_required = required
-            return SchemaLeafBoolean(name, path, parent, schema, required=is_required)
+            return SchemaBoolean(name, path, parent, schema, required=is_required)
         case _:
             print(f"warning: have not yet implemented parsing of schema of type {schema['type']} | {name} | {path}")
 

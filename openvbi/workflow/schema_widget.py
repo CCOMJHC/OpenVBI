@@ -43,21 +43,24 @@ from abc import ABC
 from pathlib import Path
 import re
 import json
+import tempfile
 
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as msgbox
 from tkinter import filedialog
 
-from openvbi.core.schema import SchemaObject, SchemaRef, \
-    SchemaLeafString, SchemaLeafInteger, SchemaLeafNumber, SchemaLeafBoolean, SchemaArray
+from csbschema import validate_data
 
-class SchemaNodeWidgetsRenderer(ABC):
+from openvbi.core.schema import SchemaObject, SchemaRef, \
+    SchemaString, SchemaInteger, SchemaNumber, SchemaBoolean, SchemaArray
+
+class SchemaNodeRenderer(ABC):
     def validate(self) -> tuple[bool,str]:
         ...
 
-class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
-    def __init__(self, parent_frame, name: str, leaf: SchemaLeafString, state: dict, row: int, column: int,
+class SchemaStringRenderer(SchemaNodeRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaString, state: dict, row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
@@ -94,8 +97,8 @@ class SchemaLeafStringRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True, ""
 
-class SchemaLeafStringEnumRenderer(SchemaNodeWidgetsRenderer):
-    def __init__(self, parent_frame, name: str, leaf: SchemaLeafString, state: dict, row: int, column: int,
+class SchemaStringEnumRenderer(SchemaNodeRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaString, state: dict, row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
@@ -131,8 +134,8 @@ class SchemaLeafStringEnumRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True, ""
 
-class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
-    def __init__(self, parent_frame, name: str, leaf: SchemaLeafInteger, state: dict, row: int, column: int,
+class SchemaIntegerRenderer(SchemaNodeRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaInteger, state: dict, row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
@@ -141,8 +144,8 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
         self.minimum = leaf.minimum
         self.maximum = leaf.maximum
         # TODO: Consider making this an IntVar() instead, which would simplify validation
-        self.stringVar = tk.StringVar()
-        state[name] = self.stringVar
+        self.intVar = tk.IntVar()
+        state[name] = self.intVar
         self.entry = tk.Entry(parent_frame, highlightthickness=1, textvariable=state[name])
         self.entry.grid(column=column, row=row)
         self.set_invalid(False)
@@ -156,12 +159,12 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
             self.is_invalid = False
 
     def validate(self) -> tuple[bool, str]:
-        if self.required and self.stringVar.get() == '':
+        if self.required and self.intVar.get() == None:
             self.set_invalid(True)
             return False, f"{self.name}: required, but no value set"
 
         try:
-            int_val: int = int(self.stringVar.get())
+            int_val: int = self.intVar.get()
         except ValueError:
             self.set_invalid(True)
             return False, f"{self.name}: value is not a valid integer"
@@ -179,8 +182,8 @@ class SchemaLeafIntegerRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True, ""
     
-class SchemaLeafNumberRenderer(SchemaNodeWidgetsRenderer):
-    def __init__(self, parent_frame, name: str, leaf: SchemaLeafNumber, state: dict, row: int, column: int,
+class SchemaNumberRenderer(SchemaNodeRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaNumber, state: dict, row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
@@ -222,8 +225,8 @@ class SchemaLeafNumberRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True, ""
     
-class SchemaLeafBooleanRenderer(SchemaNodeWidgetsRenderer):
-    def __init__(self, parent_frame, name: str, leaf: SchemaLeafBoolean, state: dict, row: int, column: int,
+class SchemaBooleanRenderer(SchemaNodeRenderer):
+    def __init__(self, parent_frame, name: str, leaf: SchemaBoolean, state: dict, row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
@@ -232,7 +235,7 @@ class SchemaLeafBooleanRenderer(SchemaNodeWidgetsRenderer):
         self.checkVar = tk.BooleanVar()
         state[name] = self.checkVar
         self.checkButton = tk.Checkbutton(parent_frame, variable=state[name], onvalue=True, offvalue=False)
-        self.checkButton.grid(column=column, row=row)
+        self.checkButton.grid(column=column, row=row, sticky='w')
         self.set_invalid(False)
     
     def set_invalid(self, is_invalid: bool):
@@ -249,14 +252,14 @@ class SchemaLeafBooleanRenderer(SchemaNodeWidgetsRenderer):
         self.set_invalid(False)
         return True, ""
 
-class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
+class SchemaObjectRenderer(SchemaNodeRenderer):
     def __init__(self, parent_frame, name: str, obj: SchemaObject, state: dict,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
         self.state = {}
         state[name] = self.state
-        self.properties: dict[str, SchemaNodeWidgetsRenderer] = {}
+        self.properties: dict[str, SchemaNodeRenderer] = {}
 
         row = 0
         for prop, value in obj.properties.items():
@@ -272,29 +275,37 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
                 if value is None:
                     print(f'error: reference {prop} has no referent.')
                     continue
+            if isinstance(value, SchemaObject):
+                object_frame = tk.LabelFrame(parent_frame, text=prop, padx=pad_x, pady=pad_y)
+                self.properties[prop] = SchemaObjectRenderer(object_frame, prop, value, self.state)
+                object_frame.grid(column=0, row=row, columnspan=2, sticky='ew')
+                row += 1
+                continue
+            if isinstance(value, SchemaArray):
+                array_frame = tk.LabelFrame(parent_frame, text=prop, padx=pad_x, pady=pad_y)
+                self.properties[prop] = SchemaArrayRenderer(array_frame, prop, value, self.state)
+                array_frame.grid(column=0, row=row, columnspan=2, sticky='ew')
+                row += 1
+                continue
             tk.Label(parent_frame, text=label, anchor='e', justify='right').grid(sticky=tk.E, column=0, row=row)
             processed: bool = False
-            if isinstance(value, SchemaLeafString):
+            if isinstance(value, SchemaString):
                 if value.enum_values is None:
-                    self.properties[prop] = SchemaLeafStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                    self.properties[prop] = SchemaStringRenderer(parent_frame, prop, value, self.state, column=1, row=row)
                 else:
-                    self.properties[prop] = SchemaLeafStringEnumRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+                    self.properties[prop] = SchemaStringEnumRenderer(parent_frame, prop, value, self.state, column=1, row=row)
                 processed = True
-            if isinstance(value, SchemaLeafInteger):
-                self.properties[prop] = SchemaLeafIntegerRenderer(parent_frame, prop, value, self.state, column=1, row=row)
+            if isinstance(value, SchemaInteger):
+                self.properties[prop] = SchemaIntegerRenderer(parent_frame, prop, value, self.state, column=1, row=row)
                 processed = True
-            if isinstance(value, SchemaLeafNumber):
-                self.properties[prop] = SchemaLeafNumberRenderer(parent_frame, prop, value, self.state, column=1,
+            if isinstance(value, SchemaNumber):
+                self.properties[prop] = SchemaNumberRenderer(parent_frame, prop, value, self.state, column=1,
                                                                  row=row)
                 processed = True
-            if isinstance(value, SchemaLeafBoolean):
-                self.properties[prop] = SchemaLeafBooleanRenderer(parent_frame, prop, value, self.state, row=row, column=1)
+            if isinstance(value, SchemaBoolean):
+                self.properties[prop] = SchemaBooleanRenderer(parent_frame, prop, value, self.state, row=row, column=1)
                 processed = True
-            if isinstance(value, SchemaArray):
-                array_frame = tk.Frame(parent_frame)
-                self.properties[prop] = SchemaArrayWidgetsRenderer(array_frame, prop, value, self.state)
-                array_frame.grid(column=1, row=row)      
-                processed = True
+
             if not processed:
                 print(f"error: have not yet implemented rendering of node type {type(value)} | {name} | {prop}")
             row += 1
@@ -309,21 +320,21 @@ class SchemaObjectWidgetsRenderer(SchemaNodeWidgetsRenderer):
                 messages.append(msg)
         return valid, "\n".join(messages)
 
-class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
+class SchemaArrayRenderer(SchemaNodeRenderer):
     hor_pad = 10
     ver_pad = 5
 
-    def __init__(self, parent: tk.Frame, name: str, arr: SchemaArray, state: dict,
+    def __init__(self, parent: tk.LabelFrame, name: str, arr: SchemaArray, state: dict,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5) -> None:
-        self.state = {}
+        self.state = []
         state[name] = self.state
         self.parent = parent
         self.arr = arr
         self.is_open = False
 
-        self.preview = tk.Label(parent, text="$PREVIEW", anchor='e')
+        self.preview = tk.Label(parent, text="$PREVIEW", anchor='e', padx=pad_x, pady=pad_y)
         self.preview.grid(column=0, row=0)
         self.open_button = tk.Button(parent, text="Edit...", command=self.open)
         self.open_button.grid(column=1, row=0)
@@ -352,21 +363,22 @@ class SchemaArrayWidgetsRenderer(SchemaNodeWidgetsRenderer):
             self.is_open = False
 
 
-class SchemaRefWidgetsRenderer(SchemaNodeWidgetsRenderer):
+class SchemaRefRenderer(SchemaNodeRenderer):
     def __init__(self, parent_frame, ref: SchemaRef, state: dict,
+                 row: int, column: int,
                  *,
                  pad_x: int = 10,
                  pad_y: int = 5):
-        self.referents: dict[str, SchemaNodeWidgetsRenderer] = {}
+        self.referents: dict[str, SchemaNodeRenderer] = {}
 
         self.frame = tk.LabelFrame(parent_frame, text=ref.name,
                               padx=pad_x, pady=pad_y)
         if ref.referent:
             r = ref.referent
             if isinstance(r, SchemaObject):
-                self.referents[r.name] = SchemaObjectWidgetsRenderer(self.frame, ref.name, r, state)
+                self.referents[r.name] = SchemaObjectRenderer(self.frame, ref.name, r, state)
 
-        self.frame.pack(fill='x')
+        self.frame.grid(row=row, column=0, columnspan=2, sticky='ew')
 
     def validate(self) -> tuple[bool, str]:
         valid: bool = True
@@ -383,11 +395,17 @@ def generate_output(d: dict) -> dict:
     for k, v in d.items():
         if isinstance(v, dict):
             ser[k] = generate_output(v)
-        elif isinstance(v, tk.StringVar):
-            ser[k] = v.get()
-        elif isinstance(v, tk.BooleanVar):
-            ser[k] = v.get()
-        elif isinstance(v, tk.DoubleVar):
+        elif isinstance(v, list):
+            if len(v) > 0:
+                ser[k] = []
+                for item in v:
+                    if isinstance(item, dict):
+                        ser[k].append(generate_output(item))
+                    else:
+                        ser[k].append(item.get())
+        else:
+            # This is a leaf item which is a tk variable, so the interface is
+            # the same for any item.
             ser[k] = v.get()
     return ser
 
@@ -428,6 +446,21 @@ class MetadataMainWindow:
         else:
             msgbox.showerror("Preflight Check", "Metadata validation failed:\n" + "\n".join(messages))
 
+    def on_extern_validate(self):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json') as tmpf:
+            data = generate_output(self.state)
+            data['features'] = [] # Need this to validate as a FeatureCollection
+            json.dump(data, tmpf)
+            tmpf.flush()
+            valid, result = validate_data(tmpf.name, version='3.1.0-2024-04')
+            if valid:
+                msgbox.showinfo("External Validation", "Metadata passes validation!")
+            else:
+                errors: list[str] = []
+                for e in result['errors']:
+                    errors.append(f'path: {e["path"]} | {e["message"]}')
+                msgbox.showerror("External Validation", "Metadata validation failed:\n" + "\n".join(errors))
+
     def set_export_filename(self):
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
                                                        filetypes=(('JSON','*.json'),))
@@ -440,29 +473,60 @@ class MetadataMainWindow:
 
     def serialize(self, out_file: Path) -> bool:
         with open(out_file, mode='w') as f:
-            json.dump(generate_output(self.state), f)
+            data =  generate_output(self.state)
+            # We ignore the "features" array, since we're just trying to generate the
+            # core metadata to include in files that don't contain their own.  However,
+            # this needs to exist for the metadata to validate (since it's a FeatureCollection)
+            # so we add an empty array here.
+            data['features'] = []
+            json.dump(data, f)
         return True
 
     def do_export(self):
         is_valid, messages = self.validate_entries()
         if not is_valid:
-            print(f"Note validation failed: {messages}")
+            print(f"WARNING: validation failed: {messages}")
         # Export
         self.serialize(Path(self.export_filename.get()))
 
     def __init__(self, root: tk.Tk, schema: SchemaObject) -> None:
-        self.properties: dict[str, SchemaNodeWidgetsRenderer] = {}
+        self.properties: dict[str, SchemaNodeRenderer] = {}
         # Dict to hold state variables that will be used to generate a JSON document based on the schema
         self.state = {}
 
         self.root = tk.Toplevel(root)
 
         self.main_frame = tk.Frame(self.root, padx=self.hor_pad, pady=self.ver_pad)
-        self.main_frame.pack(fill='both')
+        self.main_frame.grid(row=0, column=0, sticky='nsew')
 
+        row: int = 0
         for v in schema.properties.values():
             if isinstance(v, SchemaRef):
-                self.properties[v.name] = SchemaRefWidgetsRenderer(self.main_frame, v, self.state)
+                self.properties[v.name] = SchemaRefRenderer(self.main_frame, v, self.state, row, column=0)
+            elif isinstance(v, SchemaObject):
+                self.properties[v.name] = SchemaObjectRenderer(self.main_frame, v.name, v, self.state)
+            elif isinstance(v, SchemaArray):
+                self.properties[v.name] = SchemaArrayRenderer(self.main_frame, v.name, v, self.state)
+            else:
+                if v.is_required:
+                    label: str = f"{v.name} *"
+                else:
+                    label: str = v.name
+                name = tk.Label(self.main_frame, text=label, anchor='e', justify='right')
+                name.grid(row=row, column=0, sticky=tk.E)
+                if isinstance(v, SchemaString):
+                    if len(v.enum_values):
+                        self.properties[v.name] = SchemaStringEnumRenderer(self.main_frame, v.name, v, self.state, row, column=1)
+                    else:
+                        self.properties[v.name] = SchemaStringRenderer(self.main_frame, v.name, v, self.state, row, column=1)
+                elif isinstance(v, SchemaInteger):
+                    self.properties[v.name] = SchemaIntegerRenderer(self.main_frame, v.name, v, self.state, row, column=1)
+                elif isinstance(v, SchemaNumber):
+                    self.properties[v.name] = SchemaNumberRenderer(self.main_frame, v.name, v, self.state, row, column=1)
+                elif isinstance(v, SchemaBoolean):
+                    self.properties[v.name] = SchemaBooleanRenderer(self.main_frame, v.name, v, self.state, row, column=1)
+            row += 1
+            
 
         self.export_frame = tk.LabelFrame(self.main_frame, text='Export', padx=self.hor_pad, pady=self.ver_pad)
         self.filename_label = tk.Label(self.export_frame, text='Filename', anchor='e')
@@ -473,18 +537,23 @@ class MetadataMainWindow:
         self.filename_button = tk.Button(self.export_frame, text='Choose...', command=self.set_export_filename)
         self.filename_button.grid(column=3, row=0)
         self.set_export_filename_invalid(False)
-        self.export_frame.pack(fill='x')
+        self.export_frame.grid(row=row, column=0, columnspan=2, sticky='ew')
+        row += 1
 
         # Set up buttons for direct actions
         self.button_frame = tk.LabelFrame(self.main_frame, text='Actions', padx=self.hor_pad, pady=self.ver_pad)
 
-        self.validate_button = tk.Button(self.button_frame, text="Preflight Check", command=self.on_preflight)
-        self.validate_button.grid(row=0, column=0)
+        self.preflight_button = tk.Button(self.button_frame, text="Preflight Check", command=self.on_preflight)
+        self.preflight_button.grid(row=0, column=0)
+
+        self.validate_button = tk.Button(self.button_frame, text='Validate', command=self.on_extern_validate)
+        self.validate_button.grid(row=0, column=1)
 
         self.export_button = tk.Button(self.button_frame, text="Export", command=self.do_export)
-        self.export_button.grid(row=0, column=1)
+        self.export_button.grid(row=0, column=2)
 
         self.exit_button = tk.Button(self.button_frame, text="Quit", command=self.root.destroy)
-        self.exit_button.grid(row=0, column=2)
+        self.exit_button.grid(row=0, column=3)
 
-        self.button_frame.pack(fill='x')
+        self.button_frame.grid(row=row, column=0, columnspan=2, sticky='ew')
+        row += 1
