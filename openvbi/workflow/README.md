@@ -42,9 +42,15 @@ In principle, these metadata files are plain text files in JSON format,
 
  which can be created and formatted with any text editor.  In practice, however, the formatting can be a little complex, and making sure that data fields with requirements are filled in correctly can be problematic.  The metadata tool component in the Workflow GUI aims to assist with this by providing a GUI to specify the various components required, which is constructed automatically from the machine-readable schema for the metadata and indicates which fields are required, and which are optional but recommended.  This specification can then be written to a suitable output JSON file, and used for further processing.
 
- ![Example of the metadata construction tool](assets/2025-10-09_WorkflowGUI_MetadataTool.png)
+ ![Example of the metadata construction tool](assets/2025-10-14_WorkflowTool_MetadataValid.png)
 
-In addition to creating metadata files, the tool can also be used to validate the existing specification.
+In addition to creating metadata files, the tool can also be used to validate the existing specification.  A simple "preflight" check can be conducted using the entries available; any errors are reported to the right of the window, and the affected entries are highlighted in red.
+
+![Example of invalid metadata tested using the internal checks](assets/2025-10-14_WorkflowTool_MetadataInternalInvalid.png)
+
+However, there are semantic checks that the external validation tool uses to ensure that the metadata is valid which cannot be determined automatically from the schema.  Therefore, there is a secondary "Validate" option that causes the code to generate the output metadata file from the current entries, and then run the validation tool to provide full checks.  Any errors are reported to the right of the window, with the path in the metadata and reported error from the validation tool.
+
+![Example of invalid metadata tested using the external validation tool](assets/2025-10-14_WorkflowTool_MetadataExternalInvalid.png)
 
 ## Custom Workflows
 
