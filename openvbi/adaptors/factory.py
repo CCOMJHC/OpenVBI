@@ -1,11 +1,8 @@
-##\file loader.py
-# This file provides a factory method for instantiating loaders logger file loadeds, currently
-# those defined in teamsurv.py, wibl.py, and ydvr.py. The extension of the input filename provided
-# is used to select the underlying loader to return. If the file uses an incorrect file extension,
-# the wrong loader will be returned.
+##\file factory.py
 #
-# Copyright 2025 Center for Coastal and Ocean Mapping & NOAA-UNH Joint
-# Hydrographic Center, University of New Hampshire.
+# A simple factory method (and supporting code) for loaders, writers, and depth messages
+#
+# Copyright 2025 OpenVBI Project.  All Rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,35 +23,44 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Type
-from pathlib import Path
+from typing import Dict, List
+from openvbi.adaptors import Loader, Writer
+from openvbi.adaptors.ydvr import YDVRLoader
+from openvbi.adaptors.wibl import WIBLLoader
+from openvbi.adaptors.teamsurv import TeamSurvLoader
+from openvbi.adaptors.generic_ascii import GenericASCIILoader
+from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
+LOADER_DICT: Dict[str, Loader] = {'YDVR': YDVRLoader, 'WIBL': WIBLLoader, 'TeamSurv': TeamSurvLoader, 'Generic ASCII': GenericASCIILoader}
+WRITER_DICT: Dict[str, Writer] = {'DCDB GeoJSON': GeoJSONWriter, 'DCDB CSV': CSVWriter}
+DEPTH_MESSAGES: Dict[str, str] = {'Depth (NMEA2000)': 'Depth', 'DBT (NMEA0183)': 'DBT', 'DPT (NMEA0183)': 'DPT'}
 
-from openvbi.adaptors import Loader, teamsurv, wibl, ydvr
+def LoaderLibrary() -> List[str]:
+    return list(LOADER_DICT.keys())
 
-def get_loader(input_file: str | Path) -> Loader:
-    """
+def LoaderFactory(loader_name: str) -> Loader:
+    try:
+        loader = LOADER_DICT[loader_name]()
+    except KeyError:
+        raise ValueError()
+    return loader
+    
+def WriterLibrary() -> List[str]:
+    return list(WRITER_DICT.keys())
 
-    :rtype: Loader
-    """
-    match input_file:
-        case str():
-            infile: Path = Path(input_file)
-        case Path():
-            infile: Path = input_file
-        case _:
-            raise ValueError(f"Expected input_file to be of type str or Path, but it was of type {type(input_file)}")
+def WriterFactory(writer_name: str) -> Writer:
+    try:
+        writer = WRITER_DICT[writer_name]()
+    except KeyError:
+        raise ValueError()
+    return writer
 
-    suffixes = infile.suffixes
-    if len(suffixes) == 0:
-        raise ValueError(f"Unable to infer loader type for input file {str(input_file)}, which has no filename suffix.")
+def DepthMsgLibrary() -> List[str]:
+    return list(DEPTH_MESSAGES.keys())
 
-    first_suff = suffixes[0].lower()
-    if first_suff == teamsurv.LOADER_SUFFIX.lower():
-            return teamsurv.TeamSurvLoader()
-    elif first_suff == wibl.LOADER_SUFFIX.lower():
-            return wibl.WIBLLoader()
-    elif first_suff == ydvr.LOADER_SUFFIX.lower():
-            return ydvr.YDVRLoader()
-    else:
-        raise ValueError("Unable to infer loader type for input file {str(input_file}: unknown filename suffix.")
+def DepthMsgTag(depth_message: str) -> str:
+    try:
+        depth_tag = DEPTH_MESSAGES[depth_message]
+    except KeyError:
+        raise ValueError()
+    return depth_tag
