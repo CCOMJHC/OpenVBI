@@ -318,7 +318,7 @@ class SchemaObjectRenderer(SchemaNodeRenderer):
             if not rc:
                 valid = False
                 messages.append(msg)
-        return valid, "\n".join(messages)
+        return valid, "\n\n".join(messages)
 
 class SchemaArrayRenderer(SchemaNodeRenderer):
     hor_pad = 10
@@ -388,7 +388,7 @@ class SchemaRefRenderer(SchemaNodeRenderer):
             if not rc:
                 valid = False
                 messages.append(msg)
-        return valid, '\n'.join(messages)
+        return valid, '\n\n'.join(messages)
 
 def generate_output(d: dict) -> dict:
     ser = {}
@@ -441,10 +441,11 @@ class MetadataMainWindow:
     
     def on_preflight(self):
         is_valid, messages = self.validate_entries()
+        self.report.delete('1.0', tk.END)
         if is_valid:
-            msgbox.showinfo("Preflight Check", "All metadata fields appear to be valid")
+            self.report.insert(tk.END, "Preflight Checks: Metadata appears to be valid.\n")
         else:
-            msgbox.showerror("Preflight Check", "Metadata validation failed:\n" + "\n".join(messages))
+            self.report.insert(tk.END, "Preflight Checks: Metadata validation failed:\n\n" + "\n\n".join(messages))
 
     def on_extern_validate(self):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.json') as tmpf:
@@ -453,13 +454,14 @@ class MetadataMainWindow:
             json.dump(data, tmpf)
             tmpf.flush()
             valid, result = validate_data(tmpf.name, version='3.1.0-2024-04')
+            self.report.delete('1.0', tk.END)
             if valid:
-                msgbox.showinfo("External Validation", "Metadata passes validation!")
+                self.report.insert(tk.END, "Metadata passes validation!\n")
             else:
                 errors: list[str] = []
                 for e in result['errors']:
-                    errors.append(f'path: {e["path"]} | {e["message"]}')
-                msgbox.showerror("External Validation", "Metadata validation failed:\n" + "\n".join(errors))
+                    errors.append(f'Path: {e["path"]}\nError: {e["message"]}')
+                self.report.insert(tk.END, "Metadata validation failed:\n\n" + "\n\n".join(errors))
 
     def set_export_filename(self):
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
@@ -484,10 +486,15 @@ class MetadataMainWindow:
 
     def do_export(self):
         is_valid, messages = self.validate_entries()
+        self.report.delete('1.0', tk.END)
         if not is_valid:
-            print(f"WARNING: validation failed: {messages}")
+            msg = "\n\n".join(messages)
+            self.report.insert(tk.END, f"WARNING: validation failed:\n\n{msg}\n\n")
         # Export
-        self.serialize(Path(self.export_filename.get()))
+        if self.serialize(Path(self.export_filename.get())):
+            self.report.insert(tk.END, f"INFO: metadata export to {self.export_filename.get()} complete.\n")
+        else:
+            self.report.insert(tk.END, f"ERROR: metadata export to {self.export_filename.get()} failed.\n")
 
     def __init__(self, root: tk.Tk, schema: SchemaObject) -> None:
         self.properties: dict[str, SchemaNodeRenderer] = {}
@@ -557,3 +564,9 @@ class MetadataMainWindow:
 
         self.button_frame.grid(row=row, column=0, columnspan=2, sticky='ew')
         row += 1
+
+        # Set up output region for reports from validation, etc.
+        self.report_frame = tk.LabelFrame(self.main_frame, text='Validation Output', padx=self.hor_pad, pady=self.ver_pad)
+        self.report = tk.Text(self.report_frame, width=100, height=50, padx=self.hor_pad, pady=self.ver_pad)
+        self.report.grid(row=0, column=0, sticky='nsew')
+        self.report_frame.grid(row=0, column=3, rowspan=row, sticky='nsew', padx=self.hor_pad, pady=self.ver_pad)
