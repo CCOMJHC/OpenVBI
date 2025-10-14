@@ -37,7 +37,7 @@ class Waterlevel(ABC):
         pass
 
     def correct(self, dataset: Dataset) -> Dataset:
-        dataset.depths = self._execute(dataset.depths)
+        dataset.data = self._execute(dataset.data)
         self._metadata(dataset.meta)
         return dataset
 

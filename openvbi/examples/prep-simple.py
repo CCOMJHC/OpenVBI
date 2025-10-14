@@ -13,14 +13,14 @@ data.meta.setVesselName('S/V Mjölnir')
 
 # Calibrate acceptable depth and time windows for data (note that these are simply for
 # demonstration purposes: this cuts off a lot of valid data!)
-min_depth = data.depths['z'].min()
-max_depth = data.depths['z'].max()
+min_depth = data.data['z'].min()
+max_depth = data.data['z'].max()
 depth_range = max_depth - min_depth
 shoal_threshold = min_depth + depth_range/3.0
 deep_threshold = max_depth - depth_range/3.0
 
-min_time = data.depths['t'].min() + 10.0*60.0 # Remove first ten minutes
-max_time = data.depths['t'].max() - 10.0*60.0 # Remove last ten minutes
+min_time = data.data['t'].min() + 10.0 * 60.0 # Remove first ten minutes
+max_time = data.data['t'].max() - 10.0 * 60.0 # Remove last ten minutes
 
 # Generate filters for shoal/deep depth, and early/late time
 shoal = shoaler_than(shoal_threshold)

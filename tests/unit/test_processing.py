@@ -1,7 +1,7 @@
 from pathlib import Path
 import uuid
 
-from openvbi.adaptors.ydvr import YDVRLoader
+from openvbi.adaptors import factory, Loader
 import openvbi.core.metadata as md
 from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
@@ -13,7 +13,7 @@ def test_basic_processing(data_path, temp_path):
 
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
-        loader = YDVRLoader(compressed=ydvr_file.suffix == '.lzma')
+        loader: Loader = factory.get_loader(ydvr_file)
         data = loader.load(ydvr_file)
     except Exception as e:
         exception_thrown = True
@@ -43,7 +43,7 @@ def test_basic_processing(data_path, temp_path):
     data.meta.setVesselID(md.VesselIdentifier.MMSI, "000000000")
 
     # YachtDevices is a NMEA2000 device, so we convert 'Depth' messages for depth information
-    data.generate_observations('Depth')
+    data.generate_observations(['Depth'])
 
     gjson_path = temp_path / '00030095.json'
     writer = GeoJSONWriter()

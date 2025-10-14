@@ -1,4 +1,5 @@
 setuptools>=76.1.0
+click>=8.0.0
 numpy>=2.0.0
 csbschema~=1.1.2
 marulc~=0.2.0

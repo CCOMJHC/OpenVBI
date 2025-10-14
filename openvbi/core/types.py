@@ -25,7 +25,7 @@
 
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, Any
 
 ## Encapsulate the types of real-world time information that can be used
 #
@@ -81,5 +81,16 @@ class RawObs(ABC):
     def Position(self) -> Tuple[float,float]:
         pass
 
-class NoDepths(RuntimeError):
+    @abstractmethod
+    def WaterTemperature(self) -> float:
+        """
+        Water temperature in degrees Kelvin
+        :return:
+        """
+        pass
+
+class NoDataFound(RuntimeError):
+    pass
+
+class NoDepths(NoDataFound):
     pass

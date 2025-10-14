@@ -77,8 +77,8 @@ class SingleStation(Waterlevel):
         super().__init__()
 
     def preload(self, dataset: Dataset) -> None:
-        startTime = dataset.depths['t'].min()
-        endTime = dataset.depths['t'].max()
+        startTime = dataset.data['t'].min()
+        endTime = dataset.data['t'].max()
         raw_levels = get_noaa_station(self._stationID, startTime, endTime)
         if raw_levels is None:
             print(f'Error: station failed to resolve waterlevels for time range [{startTime.isoformat()}, {endTime.isoformat()}].')
@@ -112,7 +112,7 @@ class ZoneTides(Waterlevel):
 
     def preload(self, dataset: Dataset) -> None:
         # Spatial join to determine which polygon each observation is in (and hence which station controls)
-        annotated_pts = geopandas.sjoin(dataset.depths, self._zones, how='inner', predicate='within')
+        annotated_pts = geopandas.sjoin(dataset.data, self._zones, how='inner', predicate='within')
         # List of all required stations
         self._stations = annotated_pts['ControlStn'].unique()
         self._tides = dict()
