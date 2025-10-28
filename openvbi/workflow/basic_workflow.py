@@ -52,7 +52,7 @@ class BasicWorkflow(Workflow):
     def outsuffix(self):
         return self.writer.suffix()
 
-    def process_file(self, infile: str | Path, outfile: str | Path, callback: Callable[[WorkflowEvent,Dict],None]) -> Tuple[bool,dict]:
+    def process_file(self, infile: str | Path, outfile: str | Path, callback: Callable[[WorkflowEvent,Dict],None] | None) -> Tuple[bool,dict]:
         errors = {"filename": infile, "stage": ""}
         try:
             errors["stage"] = "loader"
