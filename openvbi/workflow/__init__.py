@@ -31,6 +31,7 @@
 from typing import Protocol, Tuple, List, Dict, Callable
 from enum import Enum
 from pathlib import Path
+from openvbi.cache import Cache
 
 class WorkflowEvent(Enum):
     StartingWorkflow = 0
@@ -75,3 +76,8 @@ def apply_workflow(inputdir: str | Path, outputdir: str | Path, workflow: Workfl
     if callback:
         callback(WorkflowEvent.FinishingWorkflow, {'success': rc, 'processed': processed, 'errors': errors})
     return rc, processed, errors
+
+# update a specified cache with arguments before performing a workflow
+def apply_workflow_with_cache(cache: Cache, outputdir: str | Path, workflow: Workflow, **kwargs) -> Tuple[bool, List[str], List[Dict]]:
+    cache.update(kwargs)
+    return apply_workflow(cache.dir, outputdir, workflow)
