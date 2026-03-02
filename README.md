@@ -3,8 +3,9 @@ Reference Algorithms for Volunteer Bathymetric Information processing.
 
 ## Installation
 ### Local installation
+OpenVBI is available for installation via [PyPI](https://pypi.org/project/openvbi/):
 
-```pip install .```
+```pip install openvbi```
 
 ### Running in a VS Code dev container
 You will need docker installed to use the dev container. There is more info
