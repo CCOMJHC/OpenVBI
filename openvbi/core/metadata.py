@@ -253,15 +253,13 @@ class Metadata:
 
     def render(self, filename: str | Path) -> None:
         metadata = copy.deepcopy(self.meta)
-        if 'features' in metadata:
-            del metadata['features']
+        metadata['features'] = []
         with open(filename, 'w') as f:
             json.dump(metadata, f)
 
     def inspect(self) -> None:
         metadata = copy.deepcopy(self.meta)
-        if 'features' in metadata:
-            del metadata['features']
+        metadata['features'] = []
         print(json.dumps(metadata, indent=2))
 
     def metadata(self) -> Dict[str,Any]:

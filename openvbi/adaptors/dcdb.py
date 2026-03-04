@@ -73,7 +73,6 @@ class GeoJSONLoader(Loader):
         data['lat'] = [geom.y for geom in data['geometry']]
         with open(filename, 'r') as f:
             raw_meta: dict[str,Any] = json.load(f)
-        del raw_meta['features']
         meta = md.Metadata()
         meta.adopt(raw_meta)
 
