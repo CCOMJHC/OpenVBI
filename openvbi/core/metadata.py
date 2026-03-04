@@ -251,15 +251,17 @@ class Metadata:
         self.meta['properties']['processing'].append(element)
         self.meta['properties']['platform']['dataProcessed'] = True
 
-    def render(self, filename: Union[Path,str]) -> None:
+    def render(self, filename: str | Path) -> None:
         metadata = copy.deepcopy(self.meta)
-        metadata['features'] = []
+        if 'features' in metadata:
+            del metadata['features']
         with open(filename, 'w') as f:
             json.dump(metadata, f)
 
     def inspect(self) -> None:
         metadata = copy.deepcopy(self.meta)
-        metadata['features'] = []
+        if 'features' in metadata:
+            del metadata['features']
         print(json.dumps(metadata, indent=2))
 
     def metadata(self) -> Dict[str,Any]:

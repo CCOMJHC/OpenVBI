@@ -62,7 +62,7 @@ class BasicWorkflow(Workflow):
             errors["stage"] = "observation generation"
             if callback:
                 callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
-            data.generate_observations(self.depth_source)
+            data.generate_observations([self.depth_source])
             if self.metadata:
                 errors["stage"] = "metadata update"
                 if callback:

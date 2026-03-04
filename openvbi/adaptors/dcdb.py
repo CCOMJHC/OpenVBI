@@ -25,6 +25,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import geopandas
 import numpy as np
@@ -60,6 +61,23 @@ class CSVLoader(Loader):
         meta.setVessel('UNKNOWN', ship_name, -1.0)
 
         return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
+
+class GeoJSONLoader(Loader):
+    def suffix(self) -> str:
+        return '.json'
+    
+    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+        data = geopandas.read_file(filename)
+        data = data.rename(columns={'depth': 'z', 'time': 't'})
+        data['lon'] =[geom.x for geom in data['geometry']]
+        data['lat'] = [geom.y for geom in data['geometry']]
+        with open(filename, 'r') as f:
+            raw_meta: dict[str,Any] = json.load(f)
+        del raw_meta['features']
+        meta = md.Metadata()
+        meta.adopt(raw_meta)
+
+        return data, meta
 
 class GeoJSONWriter(Writer):
     def suffix(self) -> str:
