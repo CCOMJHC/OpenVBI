@@ -33,7 +33,7 @@ from marulc.exceptions import ParseError
 from openvbi.core.observations import RawN2000Obs, BadData, Dataset
 from openvbi.core.statistics import PktFaults
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from openvbi.adaptors import Loader, get_fopen, OpenVBIDataset
+from openvbi.adaptors import Loader, get_fopen
 
 
 LOADER_SUFFIX: str = '.DAT'
@@ -106,7 +106,7 @@ class YDVRLoader(Loader):
     def suffix(self) -> str:
         return LOADER_SUFFIX
     
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         """
         Load YDVR data from ``filename``.
         :param filename:

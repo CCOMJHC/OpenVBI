@@ -43,7 +43,7 @@ from openvbi.workflow.basic_workflow import BasicWorkflow
 from openvbi.workflow import apply_workflow, WorkflowEvent
 from openvbi.core.metadata import Metadata
 
-from schema_widget import MetadataMainWindow
+from openvbi.workflow.schema_widget import MetadataMainWindow
 
 class MainWindow():
     hor_pad = 10

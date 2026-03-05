@@ -31,17 +31,17 @@ import geopandas
 
 from openvbi.core.observations import RawN0183Obs, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
-from openvbi.adaptors import Loader, Writer, get_fopen, OpenVBIDataset
+from openvbi.adaptors import Loader, Writer, get_fopen
 
 class GenericASCIILoader(Loader):
     def __init__(self, maxelapsed: int, suffix: str) -> None:
         self.maxelapsed = maxelapsed
-        self.suffix = suffix
+        self.filesuffix = suffix
 
     def suffix(self) -> str:
-        return self.suffix
+        return self.filesuffix
     
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         rtn: Dataset = Dataset()
 
         # The elapsed time is milliseconds since the start of logging, and can wrap round
@@ -77,7 +77,7 @@ class GenericASCIIWriter(Writer):
     def suffix(self) -> str:
         return '.csv'
 
-    def write(self, dataset: Dataset, basename: str | Path, **kwargs) -> None:
+    def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
         """
         Write ``dataset`` to file named ``basename``+'csv'.
 
@@ -88,13 +88,13 @@ class GenericASCIIWriter(Writer):
         :param kwargs:
         :return:
         """
-        match basename:
+        match filename:
             case str():
-                basepath: Path = Path(basename)
+                basepath: Path = Path(filename)
             case Path():
-                basepath: Path = basename
+                basepath: Path = filename
             case _:
-                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
+                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(filename)}")
 
         cols = ['lon', 'lat', 'TIME', 'z']
         hdrs = ['LON', 'LAT', 'TIME', 'DEPTH']
@@ -106,13 +106,13 @@ class GenericASCIIWriter(Writer):
             elif not isinstance(user_cols, list):
                 raise ValueError(f"kwarg 'columns' is not a string or list, but must be. Type was {type(user_cols)}.")
             for uc in user_cols:
-                if uc not in dataset.data:
+                if uc not in data.data:
                     raise ValueError(f"User column {uc} is not present in dataset.")
             user_hdrs = []
             cols += user_cols
             hdrs += [c.casefold().swapcase() for c in user_cols]
 
-        output_data = dataset.data.copy()
+        output_data = data.data.copy()
         output_data['TIME'] = output_data['t'].transform(lambda x: datetime.fromtimestamp(x, tz=timezone.utc).isoformat() + 'Z')
         output_data.to_csv(basepath.with_suffix('.csv'), columns=cols, index=False,
                            header=hdrs)
@@ -122,7 +122,7 @@ class PreparsedASCIILoader(Loader):
     def suffix(self) -> str:
         return '.csv'
     
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         data = Dataset()
 
         fopen = get_fopen(filename)
