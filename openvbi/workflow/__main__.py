@@ -59,6 +59,8 @@ class MainWindow():
         self.writer = tk.StringVar()
         self.depth_message = tk.StringVar()
         self.metadata_file = tk.StringVar()
+        self.mindepth = tk.DoubleVar(value=-200.0)
+        self.maxdepth = tk.DoubleVar(value=11000.0)
 
         self.root = root
         self.main_frame = tk.Frame(root, padx=self.hor_pad, pady=self.ver_pad)
@@ -99,7 +101,7 @@ class MainWindow():
         self.workflow_writer_label.grid(row=1, column=0, sticky='e')
         self.workflow_writer_combo.grid(row=1, column=1, sticky='w')
 
-        self.workflow_depth_label = tk.Label(self.workflow_frame, text='Depth Mesage', anchor='e')
+        self.workflow_depth_label = tk.Label(self.workflow_frame, text='Depth Message', anchor='e')
         self.workflow_depth_combo = ttk.Combobox(self.workflow_frame, textvariable=self.depth_message,
                                                  values=DepthMsgLibrary())
         self.workflow_depth_combo.current(0)
@@ -114,6 +116,15 @@ class MainWindow():
         self.workflow_metadata_entry.grid(row=3, column=1, sticky='w')
         self.workflow_metadata_load_button.grid(row=3, column=2)
         self.workflow_metadata_create_button.grid(row=3, column=3)
+
+        self.workflow_mindepth_label = tk.Label(self.workflow_frame, text='Min. Depth (m)', anchor='e')
+        self.workflow_mindepth_entry = tk.Entry(self.workflow_frame, textvariable=self.mindepth)
+        self.workflow_mindepth_label.grid(row=4, column=0, sticky='e')
+        self.workflow_mindepth_entry.grid(row=4, column=1, sticky='w')
+        self.workflow_maxdepth_label = tk.Label(self.workflow_frame, text='Max. Depth (m)', anchor='e')
+        self.workflow_maxdepth_entry = tk.Entry(self.workflow_frame, textvariable=self.maxdepth)
+        self.workflow_maxdepth_label.grid(row=5, column=0, sticky='e')
+        self.workflow_maxdepth_entry.grid(row=5, column=1, sticky='w')
 
         self.workflow_run_button = tk.Button(self.input_frame, text='Run Workflow', command=self.on_run_workflow)
         self.workflow_run_button.grid(row=3, columnspan=3)
@@ -276,6 +287,7 @@ class MainWindow():
             return
 
         workflow: BasicWorkflow = BasicWorkflow(loader, depth_message, writer, metadata)
+        workflow.add_filters(self.mindepth.get(), self.maxdepth.get())
         self.workflow_thread = threading.Thread(target=apply_workflow, args=[input_dir, output_dir, workflow, self.workflow_callback])
         self.workflow_thread.start()
 

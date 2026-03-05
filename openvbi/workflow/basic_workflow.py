@@ -33,6 +33,8 @@ import copy
 from pathlib import Path
 from openvbi.adaptors import Loader, Writer
 from openvbi.core.observations import Dataset
+from openvbi.filters import Filter
+from openvbi.filters.thresholding import deeper_than, shoaler_than
 from openvbi.workflow import Workflow, WorkflowEvent
 from openvbi.core.metadata import Metadata
 
@@ -45,6 +47,11 @@ class BasicWorkflow(Workflow):
             self.metadata = copy.deepcopy(metadata.metadata())
         else:
             self.metadata = None
+        self.filters: list[Filter] = []
+    
+    def add_filters(self, min_depth: float, max_depth: float) -> None:
+        self.filters.append(deeper_than(max_depth))
+        self.filters.append(shoaler_than(min_depth))
     
     def insuffix(self):
         return self.loader.suffix()
@@ -63,6 +70,12 @@ class BasicWorkflow(Workflow):
             if callback:
                 callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
             data.generate_observations([self.depth_source])
+            if len(self.filters) > 0:
+                errors["stage"] = "depth filtering"
+                if callback:
+                    callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
+                for filter in self.filters:
+                    data = filter.Execute(data)
             if self.metadata:
                 errors["stage"] = "metadata update"
                 if callback:
