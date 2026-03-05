@@ -53,21 +53,17 @@ def get_fopen(filename: str | Path) -> Callable:
         case _:
             return open
 
-# Type aliases
-GeoPandasDataset = tuple[geopandas.GeoDataFrame, md.Metadata]
-OpenVBIDataset = TypeVar('OpenVBIDataset', bound=Dataset|GeoPandasDataset)
-
 class Loader(Protocol):
     def suffix(self) -> str:
-        pass
+        ...
 
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
-        pass
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
+        ...
 
 
 class Writer(Protocol):
     def suffix(self) -> str:
-        pass
+        ...
 
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
-        pass
+        ...

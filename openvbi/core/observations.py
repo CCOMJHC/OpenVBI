@@ -27,6 +27,7 @@ from collections.abc import Collection
 from typing import List, Tuple
 import datetime
 from dataclasses import dataclass
+import copy
 
 import pandas
 import geopandas
@@ -321,6 +322,14 @@ class Dataset:
         self.meta = md.Metadata()
         self.data = None
 
+    def adopt(self, data: geopandas.GeoDataFrame, meta: md.Metadata) -> None:
+        self.data = data.copy()
+        self.meta = copy.deepcopy(meta)
+        self.packets = list()
+        self.stats = PktStats(fault_limit=10)
+        self.timesrc = None
+        self.timebase = None
+
     def add_timebase(self) -> None:
         '''This determines, given a list ot raw packets, which time source should be used for
         generating the time lookup tables, and then generates the lookup table from the relevant
@@ -329,7 +338,6 @@ class Dataset:
         '''
         self.timesrc = determine_time_source(self.stats)
         self.timebase = generate_timebase(self.packets, self.timesrc)
-
 
     def generate_observations(self, obs_vars: Collection[str]) -> None:
         vars = set()

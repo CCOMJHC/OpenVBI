@@ -275,7 +275,7 @@ class Metadata:
         (valid, result) = validate_b12_3_1_0_2024_04(filepath)
         filepath.unlink()
         if valid:
-            return valid, None
+            return valid, dict()
         else:
             return valid, result['errors']
         

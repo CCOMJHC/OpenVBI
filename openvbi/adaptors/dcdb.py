@@ -32,7 +32,7 @@ import numpy as np
 import pandas
 
 import openvbi.core.metadata as md
-from openvbi.adaptors import Loader, Writer, OpenVBIDataset
+from openvbi.adaptors import Loader, Writer
 from openvbi.core.observations import Dataset
 
 
@@ -40,7 +40,7 @@ class CSVLoader(Loader):
     def suffix(self) -> str:
         return '.csv'
     
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         data = geopandas.read_file(filename)
         data = data.rename(columns={'DEPTH': 'z', 'LON': 'lon', 'LAT': 'lat'})
         data['t'] = np.fromiter((t.timestamp() for t in pandas.to_datetime(data['TIME'])), dtype='float')
@@ -60,13 +60,15 @@ class CSVLoader(Loader):
         meta.setReferencing(md.VerticalReference.UNKNOWN, md.VerticalReferencePosition.GNSS)
         meta.setVessel('UNKNOWN', ship_name, -1.0)
 
-        return geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta
+        dataset: Dataset = Dataset()
+        dataset.adopt(geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326'), meta)
+        return dataset
 
 class GeoJSONLoader(Loader):
     def suffix(self) -> str:
         return '.json'
     
-    def load(self, filename: str | Path, **kwargs) -> OpenVBIDataset:
+    def load(self, filename: str | Path, **kwargs) -> Dataset:
         data = geopandas.read_file(filename)
         data = data.rename(columns={'depth': 'z', 'time': 't'})
         data['lon'] =[geom.x for geom in data['geometry']]
@@ -75,56 +77,57 @@ class GeoJSONLoader(Loader):
             raw_meta: dict[str,Any] = json.load(f)
         meta = md.Metadata()
         meta.adopt(raw_meta)
-
-        return data, meta
+        dataset: Dataset = Dataset()
+        dataset.adopt(data, meta)
+        return dataset
 
 class GeoJSONWriter(Writer):
     def suffix(self) -> str:
         return '.json'
     
-    def write(self, dataset: Dataset, filename: str | Path, **kwargs) -> None:
+    def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
         FMT_OBS_TIME='%Y-%m-%dT%H:%M:%S.%fZ'
         feature_lst = []
-        for n in range(len(dataset.data)):
-            timestamp = datetime.fromtimestamp(dataset.data['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
+        for n in range(len(data.data)):
+            timestamp = datetime.fromtimestamp(data.data['t'].iloc[n], tz=timezone.utc).strftime(FMT_OBS_TIME)
             feature = {
                 "type": "Feature",
                 "geometry": {
                     "type": "Point",
                     "coordinates": [
-                        dataset.data['lon'].iloc[n],
-                        dataset.data['lat'].iloc[n]
+                        data.data['lon'].iloc[n],
+                        data.data['lat'].iloc[n]
                     ]
                 },
                 "properties": {
-                    "depth": dataset.data['z'].iloc[n],
-                    "uncertainty": dataset.data['u'].iloc[n],
+                    "depth": data.data['z'].iloc[n],
+                    "uncertainty": data.data['u'].iloc[n],
                     "time": timestamp
                 }
             }
             feature_lst.append(dict(feature))
-        data = dataset.meta.metadata()
-        data['features'] = feature_lst
+        outset = data.meta.metadata()
+        outset['features'] = feature_lst
         with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, **kwargs)
+            json.dump(outset, f, **kwargs)
 
 class CSVWriter(Writer):
     def suffix(self) -> str:
         return '.csv'
     
-    def write(self, dataset: Dataset, basename: str | Path, **kwargs) -> None:
-        match basename:
+    def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
+        match filename:
             case str():
-                basepath: Path = Path(basename)
+                basepath: Path = Path(filename)
             case Path():
-                basepath: Path = basename
+                basepath: Path = filename
             case _:
-                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(basename)}")
+                raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(filename)}")
 
-        working_depths = dataset.data.copy()
+        working_depths = data.data.copy()
         working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.fromtimestamp(x, tz=timezone.utc).isoformat() + 'Z')
         working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
-        meta = dataset.meta.metadata()
-        meta['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
+        outset = data.meta.metadata()
+        outset['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
         with open(basepath.with_suffix('.json'), 'w') as f:
-            json.dump(meta['properties'], f, **kwargs)
+            json.dump(outset['properties'], f, **kwargs)
