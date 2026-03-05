@@ -23,13 +23,11 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Protocol, Callable, TypeVar
+from typing import Protocol, Callable
 from pathlib import Path
 import gzip
 import bz2
 import lzma
-
-import geopandas
 
 import openvbi.core.metadata as md
 from openvbi.core.observations import Dataset

@@ -44,7 +44,7 @@ class TeamSurvLoader(Loader):
         with fopen(filename, mode='rt', encoding='windows-1252') as f:
             for message in f:
                 try:
-                    obs = RawN0183Obs(None, message)
+                    obs = RawN0183Obs(-1, message)
                     rtn.packets.append(obs)
                     rtn.stats.Observed(obs.Name())
                 except BadData:

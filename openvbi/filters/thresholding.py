@@ -23,8 +23,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from datetime import datetime as dt, timezone
 import geopandas
-from openvbi.core.observations import Dataset
 import openvbi.core.metadata as md
 from openvbi.filters import Filter
 from openvbi import version
@@ -42,7 +42,7 @@ class shoaler_than(Filter):
         return dataset
 
     def _metadata(self, meta: md.Metadata) -> None:
-        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, dt.now(tz=timezone.utc),
             name='ShoalDepth Filter',
             source='OpenVBI',
             version=version(),
@@ -61,7 +61,7 @@ class deeper_than(Filter):
         return dataset
 
     def _metadata(self, meta: md.Metadata) -> None:
-        meta.addProcessingAction(md.ProcessingType.ALGORITHM, None,
+        meta.addProcessingAction(md.ProcessingType.ALGORITHM, dt.now(tz=timezone.utc),
             name='DeepDepth Filter',
             source='OpenVBI',
             version=version(),

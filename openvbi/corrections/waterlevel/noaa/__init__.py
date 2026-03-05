@@ -28,6 +28,7 @@ import geopandas
 import pandas
 import numpy as np
 import datetime as dt
+from datetime import timezone
 import requests
 from openvbi.corrections.waterlevel import Waterlevel
 from openvbi.core.interpolation import InterpTable
@@ -50,6 +51,7 @@ def get_noaa_station(stationName: str, startTime: float, endTime: float) -> pand
     }
 
     request_url = requests.Request('GET', base_url, params=params).prepare().url
+    assert request_url
     response = requests.get(request_url)
     data = response.json()
 
@@ -64,11 +66,9 @@ def get_noaa_station(stationName: str, startTime: float, endTime: float) -> pand
             waterlevels['v'] = pandas.to_numeric(waterlevels['v'], errors='coerce')
             waterlevels['t'] = pandas.to_datetime(waterlevels['t'], errors='coerce')
         else:
-            print(f"Warning: Missing 't' or 'v' column in response for station {stationName}.")
-            waterlevels = None
+            raise ValueError(f"Warning: Missing 't' or 'v' column in response for station {stationName}.")
     else:
-        print(f"Warning: No 'predictions' in response for station {stationName}.")
-        waterlevels = None
+        raise ValueError(f"Warning: No 'predictions' in response for station {stationName}.")
     return waterlevels
 
 class SingleStation(Waterlevel):
@@ -90,14 +90,13 @@ class SingleStation(Waterlevel):
 
     def _execute(self, observations: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         if self._corrector is None:
-            print(f'Error: no station corrections are available.')
-            return None
-        corrections = self._corrector.interpolate(['dz',], observations['t'])[0]
+            raise ValueError('Error: no station corrections are available.')
+        corrections = self._corrector.interpolate(['dz',], observations['t'].to_numpy())[0]
         observations['z'] -= corrections
         return observations
     
     def _metadata(self, meta: md.Metadata) -> None:
-        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, None,
+        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, dt.datetime.now(tz=timezone.utc),
             reference='ChartDatum',
             datum='MLLW',
             method='Observed Waterlevel',
@@ -141,7 +140,7 @@ class ZoneTides(Waterlevel):
         return observations
 
     def _metadata(self, meta: md.Metadata) -> None:
-        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, None,
+        meta.addProcessingAction(md.ProcessingType.VERTREDUCTION, dt.datetime.now(tz=timezone.utc),
             reference='ChartDatum',
             datum='MLLW',
             method='Observed Waterlevel',

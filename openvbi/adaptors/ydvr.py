@@ -73,7 +73,7 @@ def IsMultiPacket(pgn: int) -> bool:
 def next_packet(f) -> Tuple[int, int, bytearray]:
     t_buffer = f.read(2)
     if len(t_buffer) == 0:
-        return -1, -1, ""
+        return -1, -1, bytearray()
     elapsed = struct.unpack('<H', t_buffer)[0]
     id_buffer = f.read(4)
     msgid = struct.unpack('<L', id_buffer)[0]

@@ -42,6 +42,8 @@ class TimeSource(Enum):
     Time_ZDA = 2
     ## Use NMEA0183 RMC minimum data with timestamps
     Time_RMC = 3
+    ## Unknown or not specified
+    Time_Unknown = 4
 
 ## Exception to report that no adequate source of real-world time information is available
 class NoTimeSource(Exception):
@@ -61,6 +63,10 @@ class RawObs(ABC):
 
     def SetElapsed(self, elapsed: float) -> None:
         self._elapsed = elapsed
+
+    @abstractmethod
+    def RawPacketRep(self) -> str:
+        pass
     
     def HasTime(self) -> bool:
         return self._hastime
@@ -78,7 +84,7 @@ class RawObs(ABC):
         pass
 
     @abstractmethod
-    def Position(self) -> Tuple[float,float]:
+    def Position(self) -> list[float]:
         pass
 
     @abstractmethod

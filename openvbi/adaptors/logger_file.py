@@ -169,7 +169,7 @@ class DataPacket(ABC):
     # \param self   Pointer to the object
     # \return String with the human-readable name of the packet
     @abstractmethod
-    def name(self):
+    def name(self) -> str:
         pass
 
     ## Serialise the data in the current packet into the given file
@@ -1360,7 +1360,7 @@ class AlgorithmRequest(DataPacket):
             self.parameters = kwargs['params'].encode('UTF-8')
             super().__init__(0, 0.0, 0)
         except KeyError as e:
-            raise SerialiserVersion('Bad packet parameters') from e
+            raise SpecificationError('Bad packet parameters') from e
     
     ## Provide the fixed-text string name for this data packet
     #
@@ -1707,7 +1707,7 @@ class RawIMU(DataPacket):
     # \param self   Reference for the object
     # \return Bytes array with the binary representation of the packet-specific parameters
     def payload(self) -> bytes:
-        buffer = struct.pack('<Ihhhhhhh', self.elapsed, self.gyro[0], self.gyro[1], self.gyrpo[2], self.accel[0], self.accel[1], self.accel[2])
+        buffer = struct.pack('<Ihhhhhhh', self.elapsed, self.gyro[0], self.gyro[1], self.gyro[2], self.accel[0], self.accel[1], self.accel[2])
         return buffer
 
     ## Provide the recognition ID for the packet, as used in the binary file

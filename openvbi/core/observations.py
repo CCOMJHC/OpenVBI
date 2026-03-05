@@ -24,15 +24,15 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from collections.abc import Collection
-from typing import List, Tuple
-import datetime
+from datetime import datetime as dt, timezone, timedelta
 from dataclasses import dataclass
 import copy
+import json
 
 import pandas
 import geopandas
 
-from marulc import NMEA0183Parser, NMEA2000Parser
+from marulc import NMEA0183Parser
 from marulc.nmea2000 import unpack_complete_message, get_description_for_pgn
 from marulc.exceptions import ParseError, ChecksumError, PGNError
 
@@ -45,7 +45,7 @@ from openvbi.core.timebase import determine_time_source, generate_timebase
 import openvbi.core.metadata as md
 import openvbi.core.unit_conversion as uc
 from openvbi import version
-from openvbi.adaptors.logger_file import DataPacket
+import openvbi.adaptors.logger_file as wibl
 
 
 DEPENDENT_VARS = {'Depth': 'z',                     # NMEA2000
@@ -89,15 +89,15 @@ class RawN0183Obs(RawObs):
 
         match self.Name():
             case 'ZDA':
-                base_date = datetime.datetime(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
-                time_offset = datetime.timedelta(seconds = self._data['Fields']['timestamp'])
+                base_date = dt(self._data['Fields']['year'], self._data['Fields']['month'], self._data['Fields']['day'])
+                time_offset = timedelta(seconds = self._data['Fields']['timestamp'])
             case 'RMC':
-                base_date = datetime.datetime.strptime(str(self._data['Fields']['datestamp']), '%d%m%y')
-                time_offset = datetime.datetime.strptime(str(self._data['Fields']['timestamp']), '%H%M%S') - datetime.datetime(1900, 1, 1)
+                base_date = dt.strptime(str(self._data['Fields']['datestamp']), '%d%m%y')
+                time_offset = dt.strptime(str(self._data['Fields']['timestamp']), '%H%M%S') - dt(1900, 1, 1)
             case _:
                 raise ValueError(f"Unable to parse timestamp for NMEA0183 message of name {self.Name()}")
 
-        reftime = (base_date + time_offset).astimezone(tz=datetime.timezone.utc)
+        reftime = (base_date + time_offset).astimezone(tz=timezone.utc)
         return reftime.timestamp()
     
     def Depth(self) -> float:
@@ -105,7 +105,7 @@ class RawN0183Obs(RawObs):
             raise BadData()
         return self._data['Fields']['depth_meters']
 
-    def Position(self) -> Tuple[float,float]:
+    def Position(self) -> list[float]:
         if self.Name() != 'GGA':
             raise BadData()
         raw_lon = self._data['Fields']['lon']
@@ -118,7 +118,7 @@ class RawN0183Obs(RawObs):
         lat = int(raw_lat/100) + (raw_lat % 100)/60
         if self._data['Fields']['lat_dir'] == 'S':
             lat = - lat
-        return (lon, lat)
+        return [lon, lat]
 
     def WaterTemperature(self) -> float:
         if self.Name() != 'MTW':
@@ -126,11 +126,13 @@ class RawN0183Obs(RawObs):
         temp = float(self._data['Fields']['temperature'])
         unit = self._data['Fields']['units']
         return uc.to_temperature_kelvin(temp, unit)
+    
+    def RawPacketRep(self) -> str:
+        return json.dumps(self._data, indent=2)
 
 
 class RawN2000Obs(RawObs):
     def __init__(self, elapsed: int, pgn: int, message: bytearray) -> None:
-        parser = NMEA2000Parser()
         has_time = False
         try:
             self._data = unpack_complete_message(pgn, message)
@@ -198,12 +200,12 @@ class RawN2000Obs(RawObs):
             raise BadData()
         return self._data['Fields']['depth']
 
-    def Position(self) -> Tuple[float,float]:
+    def Position(self) -> list[float]:
         match self.Name():
             case 'GNSS' | 'Position, Rapid Update':
                 lon = self._data['Fields']['longitude']
                 lat = self._data['Fields']['latitude']
-                return lon, lat
+                return [lon, lat]
             case _:
                 raise BadData()
 
@@ -212,10 +214,13 @@ class RawN2000Obs(RawObs):
             raise BadData()
         temp = float(self._data['Fields']['temperature'])
         return uc.to_temperature_kelvin(temp, 'K')
+    
+    def RawPacketRep(self) -> str:
+        return json.dumps(self._data, indent=2)
 
 
 class ParsedN2000(RawObs):
-    def __init__(self, elapsed: int, data: DataPacket) -> None:
+    def __init__(self, elapsed: int, data: wibl.DataPacket) -> None:
         if data.name() == 'SystemTime' or data.name() == 'GNSS':
             has_time = True
         else:
@@ -239,6 +244,7 @@ class ParsedN2000(RawObs):
         if self.Name() == 'SystemTime':
             timestamp = self._data.date * seconds_per_day + self._data.timestamp
         elif self.Name() == 'GNSS':
+            assert isinstance(self._data, wibl.GNSS)
             timestamp = self._data.msg_date * seconds_per_day + self._data.msg_timestamp
         else:
             return -1.0
@@ -247,21 +253,27 @@ class ParsedN2000(RawObs):
     def Depth(self) -> float:
         if self.Name() != 'Depth':
             raise BadData()
+        assert isinstance(self._data, wibl.Depth)
         return self._data.depth
 
-    def Position(self) -> Tuple[float,float]:
+    def Position(self) -> list[float]:
         if self.Name() != 'GNSS':
             raise BadData()
-        return (self._data.longitude, self._data.latitude)
+        assert isinstance(self._data, wibl.GNSS)
+        return [self._data.longitude, self._data.latitude]
 
     def WaterTemperature(self) -> float:
         if self.Name() != 'WaterTemperature':
             raise BadData()
+        assert isinstance(self._data, wibl.Temperature)
         if self._data.tempSource != 0:
             raise BadData()
         return self._data.temperature
+    
+    def RawPacketRep(self) -> str:
+        return str(self._data)
 
-def count_messages(messages: List[RawObs]) -> PktStats:
+def count_messages(messages: list[RawObs]) -> PktStats:
     """Determine the list of messages that are available in the input data source.
 
         Inputs:
@@ -290,13 +302,13 @@ class Depth:
         self.depth = depth
         self.uncrt = uncrt
 
-def generate_depth_table(depths: List[Depth]) -> geopandas.GeoDataFrame:
+def generate_depth_table(depths: list[Depth]) -> geopandas.GeoDataFrame:
     tab = pandas.DataFrame(columns=['t', 'lon', 'lat', 'z', 'u'])
     for d in depths:
         tab.loc[len(tab)] = [d.t, d.lon, d.lat, d.depth, d.uncrt]
     return geopandas.GeoDataFrame(tab, geometry=geopandas.points_from_xy(tab.lon, tab.lat), crs='EPSG:4326')
 
-def generate_depth_list(depths: geopandas.GeoDataFrame) -> List[Depth]:
+def generate_depth_list(depths: geopandas.GeoDataFrame) -> list[Depth]:
     out = list()
     for n in range(len(depths)):
         target = Depth(depths['t'][n], depths['lat'][n], depths['lon'][n], depths['z'][n], -1.0)
@@ -307,7 +319,7 @@ def generate_depth_list(depths: geopandas.GeoDataFrame) -> List[Depth]:
 
 @dataclass
 class Dataset:
-    packets:    List[RawObs]
+    packets:    list[RawObs]
     stats:      PktStats
     timesrc:    TimeSource
     timebase:   InterpTable
@@ -317,18 +329,15 @@ class Dataset:
     def __init__(self):
         self.packets = list()
         self.stats = PktStats(fault_limit=10)
-        self.timesrc = None
-        self.timebase = None
+        self.timesrc = TimeSource.Time_Unknown
         self.meta = md.Metadata()
-        self.data = None
 
     def adopt(self, data: geopandas.GeoDataFrame, meta: md.Metadata) -> None:
         self.data = data.copy()
         self.meta = copy.deepcopy(meta)
         self.packets = list()
         self.stats = PktStats(fault_limit=10)
-        self.timesrc = None
-        self.timebase = None
+        self.timesrc = TimeSource.Time_Unknown
 
     def add_timebase(self) -> None:
         '''This determines, given a list ot raw packets, which time source should be used for
@@ -340,6 +349,8 @@ class Dataset:
         self.timebase = generate_timebase(self.packets, self.timesrc)
 
     def generate_observations(self, obs_vars: Collection[str]) -> None:
+        if self.timesrc == TimeSource.Time_Unknown:
+            raise ValueError('time source is not defined in Dataset')
         vars = set()
         for ov in obs_vars:
             if ov not in DEPENDENT_VARS.keys():
@@ -362,9 +373,9 @@ class Dataset:
                 if val is not None:
                     dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
             elif obs_name in ['GGA', 'GNSS']:
-                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+                position_table.add_points(obs.Elapsed(), [str('lon'), str('lat')], obs.Position())
             elif obs_name == 'Position, Rapid Update':
-                position_table.add_points(obs.Elapsed(), ('lon', 'lat'), obs.Position())
+                position_table.add_points(obs.Elapsed(), [str('lon'), str('lat')], obs.Position())
 
         dep_var_timepoints = dep_var_table.ind()
         if len(dep_var_timepoints) == 0:
@@ -393,6 +404,10 @@ class Dataset:
 
         self.data = geopandas.GeoDataFrame(data, geometry=geopandas.points_from_xy(data.lon, data.lat), crs='EPSG:4326')
 
-        self.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, None, method='Linear Interpolation', algorithm='OpenVBI', version=version())
-        self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, None, name='OpenVBI Default Uncertainty', parameters={}, version=version(), comment='Default (non-valid) uncertainty', reference='None')
+        now: dt = dt.now(tz=timezone.utc)
+        self.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, now,
+                                      method='Linear Interpolation', algorithm='OpenVBI', version=version())
+        self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, now,
+                                      name='OpenVBI Default Uncertainty', parameters={},
+                                      version=version(), comment='Default (non-valid) uncertainty', reference='None')
         self.meta.setProcessingFlags(False, False, True)

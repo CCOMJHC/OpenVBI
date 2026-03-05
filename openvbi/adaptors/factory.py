@@ -24,6 +24,7 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from typing import Dict, List
+from pathlib import Path
 from openvbi.adaptors import Loader, Writer
 from openvbi.adaptors.ydvr import YDVRLoader
 from openvbi.adaptors.wibl import WIBLLoader
@@ -44,6 +45,14 @@ def LoaderFactory(loader_name: str) -> Loader:
     except KeyError:
         raise ValueError()
     return loader
+
+def LoaderFactoryByFilename(filename: Path) -> Loader:
+    loader_list: list[str] = [name for name in LOADER_DICT.keys() if LOADER_DICT[name].suffix() == filename.suffix]
+    if len(loader_list) == 0:
+        raise ValueError(f'filename with suffix {filename.suffix} not matched in loader database')
+    if len(loader_list) > 1:
+        raise ValueError(f'filename with suffix {filename.suffix} matches more than one loader')
+    return LOADER_DICT[loader_list[0]]
     
 def WriterLibrary() -> List[str]:
     return list(WRITER_DICT.keys())
