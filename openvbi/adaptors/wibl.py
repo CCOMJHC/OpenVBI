@@ -20,12 +20,11 @@ from openvbi.adaptors import Loader, get_fopen
 from openvbi.core.observations import RawN0183Obs, ParsedN2000, Dataset
 from openvbi.core.metadata import VerticalReference, VerticalReferencePosition
 
-
 LOADER_SUFFIX: str = '.wibl'
 
-
 class WIBLLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return LOADER_SUFFIX
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:

@@ -33,13 +33,15 @@ from openvbi.core.observations import RawN0183Obs, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
 from openvbi.adaptors import Loader, Writer, get_fopen
 
-class GenericASCIILoader(Loader):
-    def __init__(self, maxelapsed: int, suffix: str) -> None:
-        self.maxelapsed = maxelapsed
-        self.filesuffix = suffix
+LOADER_SUFFIX: str = '.txt'
 
-    def suffix(self) -> str:
-        return self.filesuffix
+class GenericASCIILoader(Loader):
+    def __init__(self, maxelapsed: int) -> None:
+        self.maxelapsed = maxelapsed
+
+    @staticmethod
+    def suffix() -> str:
+        return LOADER_SUFFIX
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
         rtn: Dataset = Dataset()
@@ -74,7 +76,8 @@ class GenericASCIIWriter(Writer):
     string or a list of string) is specified to the write method, then that/those column(s) will be included in
     CSV ouput.
     """
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.csv'
 
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
@@ -119,7 +122,8 @@ class GenericASCIIWriter(Writer):
 
 
 class PreparsedASCIILoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.csv'
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:

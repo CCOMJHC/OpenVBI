@@ -37,7 +37,8 @@ from openvbi.core.observations import Dataset
 
 
 class CSVLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.csv'
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
@@ -65,7 +66,8 @@ class CSVLoader(Loader):
         return dataset
 
 class GeoJSONLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.json'
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
@@ -82,7 +84,8 @@ class GeoJSONLoader(Loader):
         return dataset
 
 class GeoJSONWriter(Writer):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.json'
     
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
@@ -112,7 +115,8 @@ class GeoJSONWriter(Writer):
             json.dump(outset, f, **kwargs)
 
 class CSVWriter(Writer):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return '.csv'
     
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:

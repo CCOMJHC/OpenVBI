@@ -22,9 +22,8 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
-import lzma
+
 import struct
-from typing import Tuple
 from pathlib import Path
 
 from marulc.nmea2000 import get_description_for_pgn
@@ -35,11 +34,9 @@ from openvbi.core.statistics import PktFaults
 from openvbi.core.timebase import determine_time_source, generate_timebase
 from openvbi.adaptors import Loader, get_fopen
 
-
 LOADER_SUFFIX: str = '.DAT'
 
-
-def TranslateCANId(id: int) -> Tuple[int, int, int, int]:
+def TranslateCANId(id: int) -> tuple[int, int, int, int]:
     pf = (id >> 16) & 0xFF
     ps = (id >> 8) & 0xFF
     dp = (id >> 24) & 1
@@ -70,7 +67,7 @@ def IsMultiPacket(pgn: int) -> bool:
     else:
         return False
 
-def next_packet(f) -> Tuple[int, int, bytearray]:
+def next_packet(f) -> tuple[int, int, bytearray]:
     t_buffer = f.read(2)
     if len(t_buffer) == 0:
         return -1, -1, bytearray()
@@ -103,7 +100,8 @@ def next_packet(f) -> Tuple[int, int, bytearray]:
     return elapsed, pgn, packet
 
 class YDVRLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return LOADER_SUFFIX
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:

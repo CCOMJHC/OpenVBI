@@ -32,9 +32,21 @@ from openvbi.adaptors.teamsurv import TeamSurvLoader
 from openvbi.adaptors.generic_ascii import GenericASCIILoader
 from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
 
-LOADER_DICT: Dict[str, Loader] = {'YDVR': YDVRLoader, 'WIBL': WIBLLoader, 'TeamSurv': TeamSurvLoader, 'Generic ASCII': GenericASCIILoader}
-WRITER_DICT: Dict[str, Writer] = {'DCDB GeoJSON': GeoJSONWriter, 'DCDB CSV': CSVWriter}
-DEPTH_MESSAGES: Dict[str, str] = {'Depth (NMEA2000)': 'Depth', 'DBT (NMEA0183)': 'DBT', 'DPT (NMEA0183)': 'DPT'}
+LOADER_DICT: Dict[str, type[Loader]] = {
+    'YDVR': YDVRLoader,
+    'WIBL': WIBLLoader,
+    'TeamSurv': TeamSurvLoader,
+    'Generic ASCII': GenericASCIILoader
+    }
+WRITER_DICT: Dict[str, type[Writer]] = {
+    'DCDB GeoJSON': GeoJSONWriter,
+    'DCDB CSV': CSVWriter
+    }
+DEPTH_MESSAGES: Dict[str, str] = {
+    'Depth (NMEA2000)': 'Depth',
+    'DBT (NMEA0183)': 'DBT',
+    'DPT (NMEA0183)': 'DPT'
+    }
 
 def LoaderLibrary() -> List[str]:
     return list(LOADER_DICT.keys())
@@ -52,7 +64,7 @@ def LoaderFactoryByFilename(filename: Path) -> Loader:
         raise ValueError(f'filename with suffix {filename.suffix} not matched in loader database')
     if len(loader_list) > 1:
         raise ValueError(f'filename with suffix {filename.suffix} matches more than one loader')
-    return LOADER_DICT[loader_list[0]]
+    return LOADER_DICT[loader_list[0]]()
     
 def WriterLibrary() -> List[str]:
     return list(WRITER_DICT.keys())

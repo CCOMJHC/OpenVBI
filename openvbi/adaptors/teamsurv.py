@@ -29,12 +29,11 @@ from openvbi.core.observations import RawN0183Obs, BadData, Dataset
 from openvbi.core.timebase import determine_time_source, generate_timebase
 from openvbi.adaptors import Loader, get_fopen
 
-
 LOADER_SUFFIX: str = '.TSV'
 
-
 class TeamSurvLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return LOADER_SUFFIX
 
     def load(self, filename: str | Path, **kwargs) -> Dataset:
