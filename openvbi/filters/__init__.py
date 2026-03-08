@@ -23,6 +23,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from typing import Any
 from abc import ABC, abstractmethod
 
 import geopandas
@@ -38,6 +39,11 @@ class Filter(ABC):
         dataset.data = self._execute(dataset.data)
         self._metadata(dataset.meta)
         return dataset
+    
+    @property
+    @abstractmethod
+    def params(self) -> dict[str,Any]:
+        pass
 
     @abstractmethod
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
