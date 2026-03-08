@@ -181,7 +181,7 @@ class Metadata:
         element['type'] = procType.value
         if timestamp is None:
             timestamp = dt.datetime.now(tz=timezone.utc)
-        element['timestamp'] = timestamp.isoformat() + 'Z'
+        element['timestamp'] = timestamp.replace(tzinfo=None).isoformat() + 'Z'
         if procType == ProcessingType.TIMESTAMP:
             if 'method' not in kwargs:
                 raise ValueError()

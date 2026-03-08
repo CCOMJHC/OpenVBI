@@ -31,6 +31,7 @@ from openvbi.adaptors.wibl import WIBLLoader
 from openvbi.adaptors.teamsurv import TeamSurvLoader
 from openvbi.adaptors.generic_ascii import GenericASCIILoader
 from openvbi.adaptors.dcdb import GeoJSONLoader, CSVLoader, GeoJSONWriter, CSVWriter
+from openvbi.adaptors.geopackage import GeoPackageLoader, GeoPackageWriter
 
 LOADER_DICT: Dict[str, type[Loader]] = {
     'YDVR': YDVRLoader,
@@ -39,10 +40,12 @@ LOADER_DICT: Dict[str, type[Loader]] = {
     'Generic ASCII': GenericASCIILoader,
     'DCDB CSV+meta': CSVLoader,
     'DCDB GeoJSON': GeoJSONLoader,
+    'GeoPackage': GeoPackageLoader,
     }
 WRITER_DICT: Dict[str, type[Writer]] = {
     'DCDB GeoJSON': GeoJSONWriter,
-    'DCDB CSV': CSVWriter
+    'DCDB CSV': CSVWriter,
+    'GeoPackage': GeoPackageWriter,
     }
 DEPTH_MESSAGES: Dict[str, str] = {
     'Depth (NMEA2000)': 'Depth',
