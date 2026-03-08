@@ -30,13 +30,15 @@ from openvbi.adaptors.ydvr import YDVRLoader
 from openvbi.adaptors.wibl import WIBLLoader
 from openvbi.adaptors.teamsurv import TeamSurvLoader
 from openvbi.adaptors.generic_ascii import GenericASCIILoader
-from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
+from openvbi.adaptors.dcdb import GeoJSONLoader, CSVLoader, GeoJSONWriter, CSVWriter
 
 LOADER_DICT: Dict[str, type[Loader]] = {
     'YDVR': YDVRLoader,
     'WIBL': WIBLLoader,
     'TeamSurv': TeamSurvLoader,
-    'Generic ASCII': GenericASCIILoader
+    'Generic ASCII': GenericASCIILoader,
+    'DCDB CSV+meta': CSVLoader,
+    'DCDB GeoJSON': GeoJSONLoader,
     }
 WRITER_DICT: Dict[str, type[Writer]] = {
     'DCDB GeoJSON': GeoJSONWriter,
@@ -59,6 +61,8 @@ def LoaderFactory(loader_name: str) -> Loader:
     return loader
 
 def LoaderFactoryByFilename(filename: Path) -> Loader:
+    if not isinstance(filename, Path):
+        raise ValueError('filename must be a pathlib.Path')
     loader_list: list[str] = [name for name in LOADER_DICT.keys() if LOADER_DICT[name].suffix() == filename.suffix]
     if len(loader_list) == 0:
         raise ValueError(f'filename with suffix {filename.suffix} not matched in loader database')
