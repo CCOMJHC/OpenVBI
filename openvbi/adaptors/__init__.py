@@ -23,17 +23,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
-from typing import Protocol, Callable, TypeVar
+from abc import ABC, abstractmethod
+from typing import Callable
 from pathlib import Path
 import gzip
 import bz2
 import lzma
 
-import geopandas
-
-import openvbi.core.metadata as md
 from openvbi.core.observations import Dataset
-
 
 def get_fopen(filename: str | Path) -> Callable:
     if isinstance(filename, Path):
@@ -53,17 +50,23 @@ def get_fopen(filename: str | Path) -> Callable:
         case _:
             return open
 
-class Loader(Protocol):
-    def suffix(self) -> str:
+class Loader(ABC):
+    @staticmethod
+    @abstractmethod
+    def suffix() -> str:
         ...
 
+    @abstractmethod
     def load(self, filename: str | Path, **kwargs) -> Dataset:
         ...
 
 
-class Writer(Protocol):
-    def suffix(self) -> str:
+class Writer(ABC):
+    @staticmethod
+    @abstractmethod
+    def suffix() -> str:
         ...
 
+    @abstractmethod
     def write(self, data: Dataset, filename: str | Path, **kwargs) -> None:
         ...

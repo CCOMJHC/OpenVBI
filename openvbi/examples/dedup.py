@@ -1,6 +1,4 @@
 import time
-import pandas
-import geopandas
 import json
 from openvbi.adaptors.generic_ascii import PreparsedASCIILoader
 from openvbi.filters.deduplicate import deduplicate

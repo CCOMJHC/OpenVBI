@@ -14,7 +14,7 @@ meta: Metadata = Metadata()
 
 meta.setProviderID(provider_name, provider_email)
 meta.setIdentifiers(logger_uuid, 'YDVR-04N', '1.0')
-meta.setReferencing(VerticalReference.TRANSDUCER.value, VerticalReferencePosition.GNSS.value)
+meta.setReferencing(VerticalReference.TRANSDUCER, VerticalReferencePosition.GNSS)
 meta.setVesselName(vessel_name)
 
 workflow: BasicWorkflow = BasicWorkflow(YDVRLoader(), 'Depth', GeoJSONWriter(), meta)

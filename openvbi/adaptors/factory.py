@@ -24,16 +24,34 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from typing import Dict, List
+from pathlib import Path
 from openvbi.adaptors import Loader, Writer
 from openvbi.adaptors.ydvr import YDVRLoader
 from openvbi.adaptors.wibl import WIBLLoader
 from openvbi.adaptors.teamsurv import TeamSurvLoader
 from openvbi.adaptors.generic_ascii import GenericASCIILoader
-from openvbi.adaptors.dcdb import GeoJSONWriter, CSVWriter
+from openvbi.adaptors.dcdb import GeoJSONLoader, CSVLoader, GeoJSONWriter, CSVWriter
+from openvbi.adaptors.geopackage import GeoPackageLoader, GeoPackageWriter
 
-LOADER_DICT: Dict[str, Loader] = {'YDVR': YDVRLoader, 'WIBL': WIBLLoader, 'TeamSurv': TeamSurvLoader, 'Generic ASCII': GenericASCIILoader}
-WRITER_DICT: Dict[str, Writer] = {'DCDB GeoJSON': GeoJSONWriter, 'DCDB CSV': CSVWriter}
-DEPTH_MESSAGES: Dict[str, str] = {'Depth (NMEA2000)': 'Depth', 'DBT (NMEA0183)': 'DBT', 'DPT (NMEA0183)': 'DPT'}
+LOADER_DICT: Dict[str, type[Loader]] = {
+    'YDVR': YDVRLoader,
+    'WIBL': WIBLLoader,
+    'TeamSurv': TeamSurvLoader,
+    'Generic ASCII': GenericASCIILoader,
+    'DCDB CSV+meta': CSVLoader,
+    'DCDB GeoJSON': GeoJSONLoader,
+    'GeoPackage': GeoPackageLoader,
+    }
+WRITER_DICT: Dict[str, type[Writer]] = {
+    'DCDB GeoJSON': GeoJSONWriter,
+    'DCDB CSV': CSVWriter,
+    'GeoPackage': GeoPackageWriter,
+    }
+DEPTH_MESSAGES: Dict[str, str] = {
+    'Depth (NMEA2000)': 'Depth',
+    'DBT (NMEA0183)': 'DBT',
+    'DPT (NMEA0183)': 'DPT'
+    }
 
 def LoaderLibrary() -> List[str]:
     return list(LOADER_DICT.keys())
@@ -44,6 +62,16 @@ def LoaderFactory(loader_name: str) -> Loader:
     except KeyError:
         raise ValueError()
     return loader
+
+def LoaderFactoryByFilename(filename: Path) -> Loader:
+    if not isinstance(filename, Path):
+        raise ValueError('filename must be a pathlib.Path')
+    loader_list: list[str] = [name for name in LOADER_DICT.keys() if LOADER_DICT[name].suffix() == filename.suffix]
+    if len(loader_list) == 0:
+        raise ValueError(f'filename with suffix {filename.suffix} not matched in loader database')
+    if len(loader_list) > 1:
+        raise ValueError(f'filename with suffix {filename.suffix} matches more than one loader')
+    return LOADER_DICT[loader_list[0]]()
     
 def WriterLibrary() -> List[str]:
     return list(WRITER_DICT.keys())

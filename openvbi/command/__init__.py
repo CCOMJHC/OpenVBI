@@ -4,7 +4,7 @@ import traceback
 
 import click
 
-from openvbi.adaptors import factory, Loader
+from openvbi.adaptors.factory import LoaderFactoryByFilename, Loader
 import openvbi.workflow_gui.gui as workflow_gui
 
 @click.version_option()
@@ -26,12 +26,12 @@ def dump(input_file: Path, output):
 
     """
     try:
-        loader: Loader = factory.get_loader(input_file)
+        loader: Loader = LoaderFactoryByFilename(input_file)
         data = loader.load(input_file)
         for i, p in enumerate(data.packets):
             output.write(f"Packet {i}: name: {p.Name()}\n")
             if hasattr(p, '_data'):
-                output.write(f"\t_data: {p._data}\n")
+                output.write(f"\t_data: {p.RawPacketRep()}\n")
             else:
                 output.write(f"\tNo _data in packet.\n")
     except Exception as e:

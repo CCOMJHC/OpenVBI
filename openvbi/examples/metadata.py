@@ -1,5 +1,6 @@
 import uuid
 import json
+from datetime import datetime as dt, timezone
 import openvbi.core.metadata as md
 from openvbi import version
 
@@ -38,7 +39,7 @@ metadata.setVessel('Private Vessel', 'White Rose of Drachs', 65.0)
 metadata.setVesselID(md.VesselIdentifier.MMSI, '369958000')
 metadata.addSensor(md.SensorType.SOUNDER, 'Garmin', 'GT-50', [4.2, 0.0, 5.4], draft=1.4, draftUncert = 0.2, frequency = 200000)
 # Note that parameters can be set to 'None' if unknown.
-metadata.addSensor(md.SensorType.GNSS, 'Litton Marine Systems', 'LMX420', position=None)
+metadata.addSensor(md.SensorType.GNSS, 'Litton Marine Systems', 'LMX420', position=[])
 
 metadata.setProcessingFlags(True, True, True)
 metadata.setComment('Example metadata only, not valid for post-processing')
@@ -48,8 +49,8 @@ report_metadata(metadata, 'Recommended Metadata')
 # Phase 3: Processing metadata.  This section forms a lineage description of the processing
 # steps that have been applied to the data since it was captured.
 
-metadata.addProcessingAction(md.ProcessingType.ALGORITHM, None, name='Deduplication', source='OpenVBI', version=version())
-metadata.addProcessingAction(md.ProcessingType.VERTREDUCTION, None, reference='ChartDatum' , datum='MLLW', method='Observed Waterlevel', model='NOAA Zone Tides')
+metadata.addProcessingAction(md.ProcessingType.ALGORITHM, dt.now(tz=timezone.utc), name='Deduplication', source='OpenVBI', version=version())
+metadata.addProcessingAction(md.ProcessingType.VERTREDUCTION, dt.now(tz=timezone.utc), reference='ChartDatum' , datum='MLLW', method='Observed Waterlevel', model='NOAA Zone Tides')
 
 report_metadata(metadata, 'Processing Metadata')
 

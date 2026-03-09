@@ -37,6 +37,7 @@ from typing import Dict, Any, Tuple, Union, List
 from pathlib import Path
 from enum import StrEnum
 import datetime as dt
+from datetime import timezone
 import tempfile
 import os
 import json
@@ -114,8 +115,8 @@ class Metadata:
         self.meta['properties']['trustedNode']['providerLoggerVersion'] = loggerVersion
     
     def setReferencing(self, verticalRef: VerticalReference, verticalRefPosition: VerticalReferencePosition) -> None:
-        self.meta['properties']['trustedNode']['verticalReferenceOfDepth'] = verticalRef
-        self.meta['properties']['trustedNode']['vesselPositionReferencePoint'] = verticalRefPosition
+        self.meta['properties']['trustedNode']['verticalReferenceOfDepth'] = verticalRef.value
+        self.meta['properties']['trustedNode']['vesselPositionReferencePoint'] = verticalRefPosition.value
     
     def setVesselName(self, vesselName: str) -> None:
         self.meta['properties']['platform']['name'] = vesselName
@@ -126,14 +127,14 @@ class Metadata:
         self.meta['properties']['platform']['length'] = vesselLength
     
     def setVesselID(self, idType: VesselIdentifier, idNumber: str) -> None:
-        self.meta['properties']['platform']['IDType'] = idType
+        self.meta['properties']['platform']['IDType'] = idType.value
         self.meta['properties']['platform']['IDNumber'] = idNumber
     
     def addSensor(self, sensorType: SensorType, make: str, model: str, position: List[float], **kwargs) -> None:
         sensor = dict()
         if type is None:
             raise ValueError()
-        sensor['type'] = sensorType
+        sensor['type'] = sensorType.value
         if make is not None:
             sensor['make'] = make
         if model is not None:
@@ -167,7 +168,7 @@ class Metadata:
             self.meta['properties']['platform']['dataProcessed'] = dataProcessed
     
     def getComment(self) -> str:
-        value: str = None
+        value: str = ''
         if 'contributorComments' in self.meta['properties']:
             value = self.meta['properties']['platform']['contributorComments']
         return value
@@ -177,10 +178,10 @@ class Metadata:
     
     def addProcessingAction(self, procType: ProcessingType, timestamp: dt.datetime, **kwargs) -> None:
         element = dict()
-        element['type'] = procType
+        element['type'] = procType.value
         if timestamp is None:
-            timestamp = dt.datetime.utcnow()
-        element['timestamp'] = timestamp.isoformat() + 'Z'
+            timestamp = dt.datetime.now(tz=timezone.utc)
+        element['timestamp'] = timestamp.replace(tzinfo=None).isoformat() + 'Z'
         if procType == ProcessingType.TIMESTAMP:
             if 'method' not in kwargs:
                 raise ValueError()

@@ -20,12 +20,11 @@ from openvbi.adaptors import Loader, get_fopen
 from openvbi.core.observations import RawN0183Obs, ParsedN2000, Dataset
 from openvbi.core.metadata import VerticalReference, VerticalReferencePosition
 
-
 LOADER_SUFFIX: str = '.wibl'
 
-
 class WIBLLoader(Loader):
-    def suffix(self) -> str:
+    @staticmethod
+    def suffix() -> str:
         return LOADER_SUFFIX
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
@@ -46,16 +45,20 @@ class WIBLLoader(Loader):
                         continue
                     if pkt.name() == 'Metadata':
                         # This is mandatory, so we should get at least minimal identification
+                        assert isinstance(pkt, LoggerFile.Metadata)
                         logger_UUID = pkt.logger_name
                         ship_name = pkt.ship_name
                     if pkt.name() == 'SerialiserVersion':
                         # This is mandatory
+                        assert isinstance(pkt, LoggerFile.SerialiserVersion)
                         firmware_version = f'{pkt.major}.{pkt.minor}/{pkt.nmea0183_version}/{pkt.nmea2000_version}/{pkt.imu_version}'
                     if pkt.name() == 'JSONMetadata':
                         # This is optional
+                        assert isinstance(pkt, LoggerFile.JSONMetadata)
                         metadata = json.loads(pkt.metadata_element.decode('utf-8'))
                     if pkt.name() == 'SerialString':
                         # Raw NMEA0183 strings
+                        assert isinstance(pkt, LoggerFile.SerialString)
                         packet = RawN0183Obs(pkt.elapsed, pkt.data.decode('utf-8').strip())
                     if pkt.name() == 'Depth' or pkt.name() == 'GNSS' or pkt.name() == 'SystemTime':
                         # NMEA2000 data for depth, position, and time
@@ -80,7 +83,7 @@ class WIBLLoader(Loader):
         if current_meta['properties']['trustedNode']['providerOrganizationName'] == 'NOTSET':
             data.meta.setProviderID('OpenVBI', 'hello@openvbi.org')
         if current_meta['properties']['trustedNode']['verticalReferenceOfDepth'] == 'NOTSET':
-            data.meta.setReferencing(VerticalReference.TRANSDUCER.value, VerticalReferencePosition.TRANSDUCER.value)
+            data.meta.setReferencing(VerticalReference.TRANSDUCER, VerticalReferencePosition.TRANSDUCER)
         data.add_timebase()
 
         return data
