@@ -23,7 +23,6 @@ classifiers = [
 
 [project.scripts]
 vbi = "openvbi.command:cli"
-converter = "openvbi.workflow.__main__:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "openvbi.__version__"}

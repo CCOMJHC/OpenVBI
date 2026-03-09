@@ -30,6 +30,7 @@
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
 from typing import cast, Dict
+from pathlib import Path
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -38,12 +39,15 @@ import json
 import threading
 
 from openvbi.core.schema import open_schema, parse_schema, SchemaNode, SchemaObject
-from openvbi.adaptors.factory import LoaderLibrary, LoaderFactory, WriterLibrary, WriterFactory, DepthMsgLibrary, DepthMsgTag
+from openvbi.adaptors.factory import (
+    LoaderLibrary, LoaderFactory, WriterLibrary, WriterFactory,
+    DepthMsgLibrary, DepthMsgTag
+)
 from openvbi.workflow.basic_workflow import BasicWorkflow
 from openvbi.workflow import apply_workflow, WorkflowEvent
 from openvbi.core.metadata import Metadata
 
-from openvbi.workflow.schema_widget import MetadataMainWindow
+from openvbi.workflow_gui.schema_widget import MetadataMainWindow
 
 class MainWindow():
     hor_pad = 10
@@ -291,9 +295,12 @@ class MainWindow():
         self.workflow_thread = threading.Thread(target=apply_workflow, args=[input_dir, output_dir, workflow, self.workflow_callback])
         self.workflow_thread.start()
 
-def main():
+def main(schema_source: str = ''):
     try:
-        schema: dict = open_schema()
+        if len(schema_source) > 0:
+            schema: dict = open_schema(schema_filename=schema_source)
+        else:
+            schema: dict = open_schema()
         schema_node: SchemaNode = parse_schema(schema, None, None, None)
         schema_obj: SchemaObject = cast(SchemaObject, schema_node)
         n_resolved: int = schema_obj.resolve_refs()
