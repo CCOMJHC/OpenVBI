@@ -23,63 +23,50 @@ class Outliers(Filter):
             'imputer_random': 42,
             'smoother_width': 50
         }
+        self._smoothed_depth = pd.Series()
+        self._outliers_flags = pd.Series()
         super().__init__()
 
     @property
     def params(self) -> dict[str,Any]:
         return self._params
     
+    @property
+    def smoothed(self) -> pd.Series:
+        return self._smoothed_depth
+    
+    @property
+    def outliers(self) -> pd.Series:
+        return self._outliers_flags
+    
     def _execute(self, dataset: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-        self.n_inputs = dataset.shape[0]
-        dataset['Outlier'] = False
-        processed_data = dataset[["lat", "lon", "z"]]
-        scaler = StandardScaler()
-        # Pass 1: Lenient threshold (99th percentile)
-        filtered_data_1 = self._detect_outliers(
-            processed_data.copy(),
-            scaler,
-            threshold_percentile=self._params['thresholds'][0],
-            original_gdf=dataset
-        )
-        assert isinstance(filtered_data_1, gpd.GeoDataFrame)
-
-        # Pass 2: Moderate threshold (98th percentile)
-        filtered_data_2 = self._detect_outliers(
-            filtered_data_1.copy(),
-            scaler,
-            threshold_percentile=self._params['thresholds'][1],
-            original_gdf=dataset
-        )
-        assert isinstance(filtered_data_2, gpd.GeoDataFrame)
-
-        # Pass 3: Final threshold (98th percentile, return smoothed depth)
-        final_smoothed_depth = self._detect_outliers(
-            filtered_data_2.copy(),
-            scaler,
-            threshold_percentile=self._params['thresholds'][2],
-            original_gdf=dataset,
-            return_smoothed=True
-        )
-        assert isinstance(final_smoothed_depth, pd.Series)
-        self._outliers_flags = dataset['Outlier']
-        self._smoothed_depths = final_smoothed_depth
-        dataset.drop(columns='Outlier')
-        return dataset[self._outliers_flags]
+        self._n_inputs = dataset.shape[0]
+        self._outliers_flags: pd.Series = pd.Series(False, index=dataset.index, dtype=bool)
+        self._smoothed_depth = pd.Series(np.nan, index=dataset.index, dtype=float)
+        
+        processed_data = dataset[["lat", "lon", "z"]].copy()
+        processed_data = self._detect_outliers(processed_data, self._params['thresholds'][0])
+        processed_data = self._detect_outliers(processed_data, self._params['thresholds'][1])
+        self._detect_outliers(processed_data, self._params['thresholds'][2], compute_smoothed=True)
+        
+        return dataset[~self._outliers_flags]
 
     def _metadata(self, meta: md.Metadata) -> None:
-        n_outputs: int = self._outliers_flags.sum()
+        n_outputs: int = self._n_inputs - self._outliers_flags.sum()
         meta.addProcessingAction(md.ProcessingType.ALGORITHM, dt.now(tz=timezone.utc),
                                  name='Outlier Removal (MICE)',
                                  source='OpenVBI',
                                  version=version(),
-                                 parameters=self._params,
-                                 comment=f'After filtering, total {n_outputs} points selected from {self.n_inputs}.')
+                                 parameters=self.params,
+                                 comment=f'After filtering, total {n_outputs} points selected from {self._n_inputs}.')
 
-    def _detect_outliers(self, data: gpd.GeoDataFrame, scaler: StandardScaler, threshold_percentile:
-                        float, original_gdf: gpd.GeoDataFrame, return_smoothed: bool = False) -> pd.Series | gpd.GeoDataFrame:
+    def _detect_outliers(self, data: gpd.GeoDataFrame, threshold_percentile: float,
+                         compute_smoothed: bool = False) -> gpd.GeoDataFrame:
         # Normalize data
+        scaler = StandardScaler()
         data_scaled = scaler.fit_transform(data)
-
+        assert scaler.scale_ and scaler.mean_
+        
         # Use MICE algorithm for Predictive Mean Matching Imputation
         imputer = IterativeImputer(
             estimator=LinearRegression(),
@@ -87,8 +74,6 @@ class Outliers(Filter):
             random_state=self._params['imputer_random'],
             sample_posterior=False
         )
-        
-        # Apply imputation
         data_imputed = imputer.fit_transform(data_scaled)
         
         # Smooth the imputed depth values
@@ -98,19 +83,13 @@ class Outliers(Filter):
         residuals = np.abs(data_scaled[:, 2] - smoothed_depth)
         threshold = np.percentile(residuals, threshold_percentile)
         outliers = residuals > threshold
+        self._outliers_flags[data.index[outliers]] = True
         
         # Denormalize smoothed imputed depth
-        assert scaler.scale_ and scaler.mean_
         smoothed_depth_denorm = smoothed_depth * scaler.scale_[2] + scaler.mean_[2]
-        
-        # Update the original GeoDataFrame's `Outlier` column
-        original_gdf.loc[data.index[outliers], 'Outlier'] = True
-
-        if return_smoothed:
+        if compute_smoothed:
             # Create a full-length smoothed depth array, filling with NaN for removed rows
-            full_smoothed_depth = pd.Series(index=original_gdf.index, dtype=float)
-            full_smoothed_depth[data.index] = smoothed_depth_denorm
-            return full_smoothed_depth
+            self._smoothed_depth[data.index] = smoothed_depth_denorm
 
         # Remove outliers from the current dataset for the next iteration
         return data[~outliers]
