@@ -65,7 +65,7 @@ class Outliers(Filter):
         # Normalize data
         scaler = StandardScaler()
         data_scaled = scaler.fit_transform(data)
-        assert scaler.scale_ and scaler.mean_
+        assert scaler.scale_ is not None and scaler.mean_ is not None
         
         # Use MICE algorithm for Predictive Mean Matching Imputation
         imputer = IterativeImputer(
