@@ -5,6 +5,7 @@ import traceback
 import click
 
 from openvbi.adaptors.factory import LoaderFactoryByFilename, Loader
+import openvbi.workflow_gui.gui as workflow_gui
 
 @click.version_option()
 @click.group()
@@ -35,5 +36,19 @@ def dump(input_file: Path, output):
                 output.write(f"\tNo _data in packet.\n")
     except Exception as e:
         sys.exit(traceback.format_exc())
+    
+@click.command()
+@click.option('--schema', type=str, default='', help='Set the CSB Schema JSON file to use for validating metadata.')
+def workflow(schema: str) -> None:
+    '''
+    Start the workflow GUI tool.
+
+    This command starts the GUI tool to apply a workflow to a directory of files.  The workflow can
+    have any series of steps supported by the library, and might start with raw files for processing,
+    or pre-processed (e.g., DCDB GeoJSON or GeoPackage) data for post-processing, depending on the
+    workflow.
+    '''
+    workflow_gui.main(schema)
 
 cli.add_command(dump)
+cli.add_command(workflow)
