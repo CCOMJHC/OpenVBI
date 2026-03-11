@@ -70,17 +70,20 @@ class BasicWorkflow(Workflow):
             if callback:
                 callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
             data.generate_observations([self.depth_source])
+            if self.metadata:
+                errors["stage"] = "metadata update"
+                if callback:
+                    callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
+                # Since we have done processing to the data (by timestamp interpolating, etc.) we need to 
+                # make sure that the user's metadata doesn't reset this inappropriately.
+                self.metadata['properties']['platform']['dataProcessed'] = True
+                data.meta.update(self.metadata)
             if len(self.filters) > 0:
                 errors["stage"] = "depth filtering"
                 if callback:
                     callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
                 for filter in self.filters:
                     data = filter.Execute(data)
-            if self.metadata:
-                errors["stage"] = "metadata update"
-                if callback:
-                    callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
-                data.meta.update(self.metadata)
             errors["stage"] = "output writing"
             if callback:
                 callback(WorkflowEvent.StartingStage, {'stage': errors["stage"]})
