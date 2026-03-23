@@ -2,10 +2,21 @@
 Reference Algorithms for Volunteer Bathymetric Information processing.
 
 ## Installation
-### Local installation
+### Package installation
 OpenVBI is available for installation via [PyPI](https://pypi.org/project/openvbi/):
 
 ```pip install openvbi```
+
+### Local Installation
+For development branches or more recent versions of the code than are packaged, you can install the code directly from a clone of the repository by installing the requirements first, then the local code.  Use of a conda or venv virtual environment is recommended.  For example:
+```shell
+conda create -n openvbi python=3.11
+conda activate openvbi
+pip install -r requirements.txt
+pip intall .
+```
+
+If you plan to use the outlier rejection code in the `Outlier` filter (source code [here](openvbi/filters/outliers.py)) then you'll also need to install the [advanced requirements](requirements-advanced.txt) with `pip` as above before installing the local copy of the code.
 
 ### Running in a VS Code dev container
 You will need docker installed to use the dev container. There is more info
