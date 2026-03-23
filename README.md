@@ -12,11 +12,10 @@ For development branches or more recent versions of the code than are packaged, 
 ```shell
 conda create -n openvbi python=3.11
 conda activate openvbi
-pip install -r requirements.txt
-pip intall .
+pip install .
 ```
 
-If you plan to use the outlier rejection code in the `Outlier` filter (source code [here](openvbi/filters/outliers.py)) then you'll also need to install the [advanced requirements](requirements-advanced.txt) with `pip` as above before installing the local copy of the code.
+If you plan to use the outlier rejection code in the `Outlier` filter (source code [here](openvbi/filters/outliers.py)) then you'll also need to install the [advanced requirements](requirements-advanced.txt) with `pip install '.[advanced]'` before installing the local copy of the code.
 
 ### Running in a VS Code dev container
 You will need docker installed to use the dev container. There is more info
