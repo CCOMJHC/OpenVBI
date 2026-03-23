@@ -49,7 +49,7 @@ class before_time(Filter):
             name='BeforeTime Filter',
             source='OpenVBI',
             version=version(),
-            params=self.params,
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 class after_time(Filter):
@@ -72,5 +72,5 @@ class after_time(Filter):
             name='AfterTime Filter',
             source='OpenVBI',
             version=version(),
-            params=self.params,
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')

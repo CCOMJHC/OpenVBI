@@ -50,7 +50,7 @@ class shoaler_than(Filter):
             name='ShoalDepth Filter',
             source='OpenVBI',
             version=version(),
-            params=self.params,
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 # Remove any points that are deeper than the threshold specified
@@ -74,5 +74,5 @@ class deeper_than(Filter):
             name='DeepDepth Filter',
             source='OpenVBI',
             version=version(),
-            params=self.params,
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime as dt, timezone
 
 from openvbi import version
 from openvbi.core import metadata as md
@@ -56,7 +57,7 @@ def test_optional_metadata():
     metadata.addSensor(md.SensorType.SOUNDER, 'Garmin', 'GT-50', [4.2, 0.0, 5.4], draft=1.4, draftUncert=0.2,
                        frequency=200000)
     # Note that parameters can be set to 'None' if unknown.
-    metadata.addSensor(md.SensorType.GNSS, 'Litton Marine Systems', 'LMX420', position=None)
+    metadata.addSensor(md.SensorType.GNSS, 'Litton Marine Systems', 'LMX420', position=[0,0,0])
 
     metadata.setProcessingFlags(True, True, True)
     metadata.setComment('Example metadata only, not valid for post-processing')
@@ -64,9 +65,10 @@ def test_optional_metadata():
     # Phase 3: Processing metadata.  This section forms a lineage description of the processing
     # steps that have been applied to the data since it was captured.
 
-    metadata.addProcessingAction(md.ProcessingType.ALGORITHM, None, name='Deduplication', source='OpenVBI',
+    now = dt.now(timezone.utc)
+    metadata.addProcessingAction(md.ProcessingType.ALGORITHM, now, name='Deduplication', source='OpenVBI',
                                  version=version())
-    metadata.addProcessingAction(md.ProcessingType.VERTREDUCTION, None, reference='ChartDatum', datum='MLLW',
+    metadata.addProcessingAction(md.ProcessingType.VERTREDUCTION, now, reference='ChartDatum', datum='MLLW',
                                  method='Observed Waterlevel', model='NOAA Zone Tides')
 
     # Phase 4: Ensure that the metadata is valid!
