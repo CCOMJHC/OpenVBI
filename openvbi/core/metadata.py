@@ -240,7 +240,7 @@ class Metadata:
             if 'source' in kwargs:
                 element['source'] = kwargs['source']
             if 'parameters' in kwargs:
-                if not isinstance(kwargs['parameters'], 'dict'):
+                if not isinstance(kwargs['parameters'], dict):
                     raise ValueError()
                 element['parameters'] = kwargs['parameters']
             if 'version' in kwargs:

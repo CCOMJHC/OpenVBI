@@ -33,6 +33,10 @@ class before_time(Filter):
     def __init__(self, timepoint: float) -> None:
         self._threshold = timepoint
         super().__init__()
+            
+    @property
+    def params(self) -> dict:
+        return {'threshold': self._threshold}
 
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         self.n_inputs = len(dataset)
@@ -45,13 +49,18 @@ class before_time(Filter):
             name='BeforeTime Filter',
             source='OpenVBI',
             version=version(),
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 class after_time(Filter):
     def __init__(self, timepoint: float) -> None:
         self._threshold = timepoint
         super().__init__()
-
+    
+    @property
+    def params(self) -> dict:
+        return {'threshold': self._threshold}
+    
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         self.n_inputs = len(dataset)
         dataset = dataset[dataset['t'] > self._threshold]
@@ -63,4 +72,5 @@ class after_time(Filter):
             name='AfterTime Filter',
             source='OpenVBI',
             version=version(),
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')

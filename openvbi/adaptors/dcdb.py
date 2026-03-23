@@ -72,9 +72,10 @@ class GeoJSONLoader(Loader):
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
         data = geopandas.read_file(filename)
-        data = data.rename(columns={'depth': 'z', 'time': 't'})
+        data = data.rename(columns={'depth': 'z'})
         data['lon'] =[geom.x for geom in data['geometry']]
         data['lat'] = [geom.y for geom in data['geometry']]
+        data['t'] = [t.timestamp() for t in data['time']]
         with open(filename, 'r') as f:
             raw_meta: dict[str,Any] = json.load(f)
         meta = md.Metadata()

@@ -27,4 +27,4 @@ vbi = "openvbi.command:cli"
 [tool.setuptools.dynamic]
 version = {attr = "openvbi.__version__"}
 dependencies = {file = ["requirements.txt"]}
-optional-dependencies = {test = {file = ["requirements-test.txt"]}}
+optional-dependencies = {test = {file = ["requirements-test.txt"]}, advanced = {file = ["requirements-advanced.txt"]}}

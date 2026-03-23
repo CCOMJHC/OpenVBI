@@ -23,6 +23,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 # OR OTHER DEALINGS IN THE SOFTWARE.
 
+from typing import Any
+
 from datetime import datetime as dt, timezone
 import geopandas
 import openvbi.core.metadata as md
@@ -33,6 +35,10 @@ class deduplicate(Filter):
     def __init__(self, verbose: bool) -> None:
         self._verbose = verbose
         super().__init__()
+    
+    @property
+    def param(self) -> dict[str,Any]:
+        return {}
 
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         current_depth: float = 0

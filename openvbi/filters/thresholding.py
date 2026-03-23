@@ -35,6 +35,10 @@ class shoaler_than(Filter):
         self._threshold = threshold
         super().__init__()
     
+    @property
+    def params(self) -> dict:
+        return {'threshold': self._threshold}
+    
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         self.n_inputs = len(dataset)
         dataset = dataset[dataset['z'] > self._threshold]
@@ -46,6 +50,7 @@ class shoaler_than(Filter):
             name='ShoalDepth Filter',
             source='OpenVBI',
             version=version(),
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
 
 # Remove any points that are deeper than the threshold specified
@@ -53,6 +58,10 @@ class deeper_than(Filter):
     def __init__(self, threshold: float) -> None:
         self._threshold = threshold
         super().__init__()
+
+    @property
+    def params(self) -> dict:
+        return {'threshold': self._threshold}
 
     def _execute(self, dataset: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         self.n_inputs = len(dataset)
@@ -65,4 +74,5 @@ class deeper_than(Filter):
             name='DeepDepth Filter',
             source='OpenVBI',
             version=version(),
+            parameters=self.params,
             comment=f'After filtering, total {self.n_outputs} points selected from {self.n_inputs}.')
