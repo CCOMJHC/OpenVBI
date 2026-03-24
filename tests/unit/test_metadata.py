@@ -24,7 +24,7 @@ def test_mandatory_metadata():
 
     valid, errors = metadata.validate()
     assert valid
-    assert errors is None
+    assert len(errors.keys()) == 0
 
 def test_optional_metadata():
     # Phase 1: Mandatory metadata.  The core provider ID information, logger identifiers, and
@@ -72,4 +72,4 @@ def test_optional_metadata():
     # Phase 4: Ensure that the metadata is valid!
     valid, errors = metadata.validate()
     assert valid
-    assert errors is None
+    assert len(errors.keys()) == 0

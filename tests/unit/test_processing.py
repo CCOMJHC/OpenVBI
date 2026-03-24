@@ -1,3 +1,4 @@
+import lzma
 from pathlib import Path
 import uuid
 
@@ -9,11 +10,14 @@ from tests.fixtures import data_path, temp_path
 
 def test_basic_processing(data_path, temp_path):
     ydvr_file: Path = data_path / '00030011.DAT.lzma'
+    uncomp: Path = temp_path / '00030011.DAT'
+    with uncomp.open(mode='wb') as u:
+        with lzma.open(ydvr_file, mode='rb') as l:
+            u.write(l.read())
     exception_thrown: bool = False
-
     try:
         # Load data from compressed YachtDevices file, and convert into a dataframe
-        loader: Loader = factory.get_loader(ydvr_file)
+        loader: Loader = factory.LoaderFactoryByFilename(uncomp)
         data = loader.load(ydvr_file)
     except Exception as e:
         exception_thrown = True
