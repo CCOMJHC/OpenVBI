@@ -28,7 +28,7 @@ class GeoPackageLoader(Loader):
     def load(self, filename: str | Path, **kwargs) -> Dataset:
         data = geopandas.read_file(filename)
         if not set(['t', 'z', 'lon', 'lat']).issubset(data.columns):
-            raise ValueError('file {filename} does not have minimum column set')
+            raise ValueError(f'file {filename} does not have minimum column set')
         
         # Unfortunately, there is no standard way of getting the metadata back from the GPKG, so we need
         # to select from the SQLite file directly, and then parse the XML that the driver writes ...
