@@ -28,6 +28,7 @@ from datetime import datetime as dt, timezone, timedelta
 from dataclasses import dataclass
 import copy
 import json
+from math import sqrt
 
 import pandas
 import geopandas
@@ -52,6 +53,7 @@ DEPENDENT_VARS = {'Depth': 'z',                     # NMEA2000
                   'DPT': 'z',                       # NMEA0183
                   'DBT': 'z',                       # NMEA0183
                   'WaterTemperature': 'waterTemp',  # NMEA2000
+                  'RawIMU': 'accelMag',             # IMU accelerations (g) from WIBL
                   'MTW': 'waterTemp'                # NMEA0183
                  }
 
@@ -126,6 +128,9 @@ class RawN0183Obs(RawObs):
         temp = float(self._data['Fields']['temperature'])
         unit = self._data['Fields']['units']
         return uc.to_temperature_kelvin(temp, unit)
+    
+    def AccelerationMagnitude(self) -> float:
+        return super().AccelerationMagnitude()
     
     def RawPacketRep(self) -> str:
         return json.dumps(self._data, indent=2)
@@ -215,6 +220,9 @@ class RawN2000Obs(RawObs):
         temp = float(self._data['Fields']['temperature'])
         return uc.to_temperature_kelvin(temp, 'K')
     
+    def AccelerationMagnitude(self) -> float:
+        return super().AccelerationMagnitude()
+    
     def RawPacketRep(self) -> str:
         return json.dumps(self._data, indent=2)
 
@@ -269,6 +277,12 @@ class ParsedN2000(RawObs):
         if self._data.tempSource != 0:
             raise BadData()
         return self._data.temperature
+    
+    def AccelerationMagnitude(self) -> float:
+        if self.Name() != 'RawIMU':
+            raise BadData()
+        assert isinstance(self._data, wibl.RawIMU)
+        return sqrt(self._data.accel[0]**2 + self._data.accel[1]**2 + self._data.accel[2]**2)
     
     def RawPacketRep(self) -> str:
         return str(self._data)
@@ -370,6 +384,8 @@ class Dataset:
                         val = obs.Depth()
                     case 'WaterTemperature' | 'MTW':
                         val = obs.WaterTemperature()
+                    case 'RawIMU':
+                        val = obs.AccelerationMagnitude()
                 if val is not None:
                     dep_var_table.add_point(obs.Elapsed(), DEPENDENT_VARS[obs_name], val)
             elif obs_name in ['GGA', 'GNSS']:
@@ -407,7 +423,8 @@ class Dataset:
         now: dt = dt.now(tz=timezone.utc)
         self.meta.addProcessingAction(md.ProcessingType.TIMESTAMP, now,
                                       method='Linear Interpolation', algorithm='OpenVBI', version=version())
-        self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, now,
+        if emit_u:
+            self.meta.addProcessingAction(md.ProcessingType.UNCERTAINTY, now,
                                       name='OpenVBI Default Uncertainty', parameters={},
                                       version=version(), comment='Default (non-valid) uncertainty', reference='None')
         self.meta.setProcessingFlags(False, False, True)

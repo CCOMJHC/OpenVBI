@@ -11,6 +11,7 @@
 # file loading mechanisms to read the binary data and translate into RawObs
 # packets that can be stored in the TCBDataset object for further processing
 
+from dataclasses import dataclass
 import json
 from typing import Dict, Any
 from pathlib import Path
@@ -21,6 +22,31 @@ from openvbi.core.observations import RawN0183Obs, ParsedN2000, Dataset
 from openvbi.core.metadata import VerticalReference, VerticalReferencePosition
 
 LOADER_SUFFIX: str = '.wibl'
+
+@dataclass(init=False)
+class Scales:
+    acceleration: float
+    gyro: float
+    temp: float
+    temp_offset: float
+
+    def __init__(self, raw: dict[str,Any]) -> None:
+        if 'imu' not in raw:
+            raise ValueError('no imu scale factors in scales dictionary')
+        self.acceleration = 1.0 / float(raw['imu']['recipAccelScale'])
+        self.gyro = 1.0 / float(raw['imu']['recipGyroScale'])
+        self.temp = 1.0 / float(raw['imu']['recipTempScale'])
+        self.temp_offset = float(raw['imu']['tempOffset'])
+    
+    def normalise(self, pkt: LoggerFile.RawIMU) -> LoggerFile.RawIMU:
+        pkt.accel = (pkt.accel[0]*self.acceleration,
+                     pkt.accel[1]*self.acceleration,
+                     pkt.accel[2]*self.acceleration)
+        pkt.gyro = (pkt.gyro[0]*self.gyro,
+                    pkt.gyro[1]*self.gyro,
+                    pkt.gyro[2]*self.gyro)
+        pkt.temp = pkt.temp * self.temp + self.temp_offset
+        return pkt
 
 class WIBLLoader(Loader):
     @staticmethod
@@ -33,6 +59,7 @@ class WIBLLoader(Loader):
         ship_name: str = 'Anonymous'
         firmware_version: str = '0.0.0'
         metadata = None
+        scales: Scales|None = None
 
         fopen = get_fopen(filename)
         with fopen(filename, mode='rb') as f:
@@ -43,26 +70,39 @@ class WIBLLoader(Loader):
                     packet = None
                     if pkt is None:
                         continue
-                    if pkt.name() == 'Metadata':
-                        # This is mandatory, so we should get at least minimal identification
-                        assert isinstance(pkt, LoggerFile.Metadata)
-                        logger_UUID = pkt.logger_name
-                        ship_name = pkt.ship_name
-                    if pkt.name() == 'SerialiserVersion':
-                        # This is mandatory
-                        assert isinstance(pkt, LoggerFile.SerialiserVersion)
-                        firmware_version = f'{pkt.major}.{pkt.minor}/{pkt.nmea0183_version}/{pkt.nmea2000_version}/{pkt.imu_version}'
-                    if pkt.name() == 'JSONMetadata':
-                        # This is optional
-                        assert isinstance(pkt, LoggerFile.JSONMetadata)
-                        metadata = json.loads(pkt.metadata_element.decode('utf-8'))
-                    if pkt.name() == 'SerialString':
-                        # Raw NMEA0183 strings
-                        assert isinstance(pkt, LoggerFile.SerialString)
-                        packet = RawN0183Obs(pkt.elapsed, pkt.data.decode('utf-8').strip())
-                    if pkt.name() == 'Depth' or pkt.name() == 'GNSS' or pkt.name() == 'SystemTime':
-                        # NMEA2000 data for depth, position, and time
-                        packet = ParsedN2000(pkt.elapsed, pkt)
+                    match pkt.name():
+                        case 'Metadata':
+                            # This is mandatory, so we should get at least minimal identification
+                            assert isinstance(pkt, LoggerFile.Metadata)
+                            logger_UUID = pkt.logger_name
+                            ship_name = pkt.ship_name
+                        case 'SerialiserVersion':
+                            # This is mandatory
+                            assert isinstance(pkt, LoggerFile.SerialiserVersion)
+                            firmware_version = f'{pkt.major}.{pkt.minor}/{pkt.nmea0183_version}/{pkt.nmea2000_version}/{pkt.imu_version}'
+                        case 'JSONMetadata':
+                            # This is optional
+                            assert isinstance(pkt, LoggerFile.JSONMetadata)
+                            metadata = json.loads(pkt.metadata_element.decode('utf-8'))
+                        case 'SensorScales':
+                            # This appears if we're going to see sensor raw information later in the data
+                            # stream, so hold it for now.
+                            assert isinstance(pkt, LoggerFile.SensorScales)
+                            scales = Scales(pkt.config)
+                        case 'RawIMU':
+                            # Raw observations from the IMU, which we need to normalise and scale before making
+                            # them into something we can stack onto the working packet list
+                            assert isinstance(pkt, LoggerFile.RawIMU)
+                            if scales:
+                                pkt = scales.normalise(pkt)
+                                packet = ParsedN2000(pkt.elapsed, pkt)
+                        case 'SerialString':
+                            # Raw NMEA0183 strings
+                            assert isinstance(pkt, LoggerFile.SerialString)
+                            packet = RawN0183Obs(pkt.elapsed, pkt.data.decode('utf-8').strip())
+                        case 'Depth' | 'GNSS' | 'SystemTime':
+                            # NMEA2000 data for depth, position, and time
+                            packet = ParsedN2000(pkt.elapsed, pkt)
                     if packet is not None:
                         data.packets.append(packet)
                         data.stats.Observed(packet.Name())

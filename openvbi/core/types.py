@@ -90,9 +90,13 @@ class RawObs(ABC):
     @abstractmethod
     def WaterTemperature(self) -> float:
         """
-        Water temperature in degrees Kelvin
+        Water temperature in Kelvin
         :return:
         """
+        pass
+
+    @abstractmethod
+    def AccelerationMagnitude(self) -> float:
         pass
 
 class NoDataFound(RuntimeError):
