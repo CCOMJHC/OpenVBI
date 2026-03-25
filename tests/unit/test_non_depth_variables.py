@@ -1,3 +1,4 @@
+import lzma
 from pathlib import Path
 import traceback
 
@@ -11,9 +12,15 @@ from tests.fixtures import data_path, temp_path
 
 def test_non_depth_nmea2000(data_path, temp_path):
     data_file: Path = data_path / '00010001.DAT.lzma'
+    # Uncompress test file for now until we can all support for
+    # loading from a file-like object via the factory.
+    uncomp: Path = temp_path / '00010001.DAT'
+    with uncomp.open(mode='wb') as u:
+        with lzma.open(data_file, mode='rb') as l:
+            u.write(l.read())
     exception_thrown: bool = False
     try:
-        loader: Loader = factory.get_loader(data_file)
+        loader: Loader = factory.LoaderFactoryByFilename(uncomp)
         data = loader.load(data_file)
         data.generate_observations(['Depth', 'WaterTemperature'])
         # Write data to CSV file

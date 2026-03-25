@@ -39,6 +39,7 @@ TODO:
     - ...
 
 """
+import os
 from abc import ABC
 from pathlib import Path
 import re
@@ -448,12 +449,19 @@ class MetadataMainWindow:
             self.report.insert(tk.END, "Preflight Checks: Metadata validation failed:\n\n" + "\n\n".join(messages))
 
     def on_extern_validate(self):
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json') as tmpf:
-            data = generate_output(self.state)
-            data['features'] = [] # Need this to validate as a FeatureCollection
-            json.dump(data, tmpf)
-            tmpf.flush()
-            valid, result = validate_data(tmpf.name, version='3.1.0-2024-04')
+        tmp_filename = None
+        try:
+            # Create the temporary file to be validated in a context manager, but not deleting the file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json',
+                                             delete_on_close=False,
+                                             delete=False) as tmpf:
+                tmp_filename = tmpf.name
+                data = generate_output(self.state)
+                data['features'] = [] # Need this to validate as a FeatureCollection
+                json.dump(data, tmpf)
+            # Validate temporary file outside of context manager where it was created so that the
+            # file will be closed, and therefore can be opened on Windows, with its pessimistic locking.
+            valid, result = validate_data(tmp_filename, version='3.1.0-2024-04')
             self.report.delete('1.0', tk.END)
             if valid:
                 self.report.insert(tk.END, "Metadata passes validation!\n")
@@ -462,6 +470,9 @@ class MetadataMainWindow:
                 for e in result['errors']:
                     errors.append(f'Path: {e["path"]}\nError: {e["message"]}')
                 self.report.insert(tk.END, "Metadata validation failed:\n\n" + "\n\n".join(errors))
+        finally:
+            if tmp_filename is not None:
+                os.unlink(tmp_filename)
 
     def set_export_filename(self):
         export_filename = filedialog.asksaveasfilename(title="Select metadata output",
