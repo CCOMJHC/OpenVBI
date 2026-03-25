@@ -26,8 +26,9 @@ class GeoPackageLoader(Loader):
         return FILE_EXTENSION
     
     def load(self, filename: str | Path, **kwargs) -> Dataset:
+        strict: bool = kwargs.get('strict', True)
         data = geopandas.read_file(filename)
-        if not set(['t', 'z', 'lon', 'lat']).issubset(data.columns):
+        if strict and not set(['t', 'z', 'lon', 'lat']).issubset(data.columns):
             raise ValueError(f'file {filename} does not have minimum column set')
         
         # Unfortunately, there is no standard way of getting the metadata back from the GPKG, so we need
