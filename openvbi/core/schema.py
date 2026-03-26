@@ -530,7 +530,7 @@ def open_schema(*, schema_filename: str = 'CSB-schema-3_1_0-2024-04.json') -> di
     assert schema_path.exists()
     assert schema_path.is_file()
 
-    with schema_path.open(mode='r') as f:
+    with schema_path.open(mode='r', encoding='utf-8') as f:
         schema: dict = json.load(f)
     assert schema is not None
 
