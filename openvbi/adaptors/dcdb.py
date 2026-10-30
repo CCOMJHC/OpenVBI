@@ -130,7 +130,10 @@ class CSVWriter(Writer):
                 raise ValueError(f"Expected basename to be of type str or Path, but it was of type {type(filename)}")
 
         working_depths = data.data.copy()
-        working_depths['TIME'] = working_depths['t'].transform(lambda x: datetime.fromtimestamp(x, tz=timezone.utc).isoformat() + 'Z')
+        working_depths['TIME'] = working_depths['t'].transform(
+            lambda seconds: datetime.fromtimestamp(seconds, tz=timezone.utc)
+            .isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        )
         working_depths.to_csv(basepath.with_suffix('.csv'), columns=['lon', 'lat', 'z', 'TIME'], index=False, header=['LON', 'LAT', 'DEPTH', 'TIME'])
         outset = data.meta.metadata()
         outset['properties']['trustedNode']['convention'] = 'XYZ GeoJSON CSB 3.1'
